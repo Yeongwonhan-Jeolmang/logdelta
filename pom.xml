@@ -56,7 +56,7 @@
         <junit.version>5.11.3</junit.version>
 
         <compiler-plugin.version>3.13.0</compiler-plugin.version>
-        <surefire-plugin.version>3.5.2</surefire-plugin.version>
+        <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <jar-plugin.version>3.4.2</jar-plugin.version>
         <assembly-plugin.version>3.7.1</assembly-plugin.version>
         <javadoc-plugin.version>3.11.2</javadoc-plugin.version>
