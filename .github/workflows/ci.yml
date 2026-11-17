@@ -123,7 +123,7 @@ jobs:
           }
       - name: Build installer
         shell: bash
-        run: ./scripts/package.sh ${{ matrix.type }}
+        run: bash scripts/package.sh ${{ matrix.type }}
       - name: Name the macOS image by architecture
         if: runner.os == 'macOS'
         shell: bash
