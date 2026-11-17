@@ -67,6 +67,40 @@ with the same SPDX header as the existing ones:
 3. Run `mvn verify` and make sure it passes.
 4. Describe what changed and why in the pull request, with screenshots for UI changes.
 
+## Dependency updates
+
+Dependabot opens monthly pull requests for the Maven plugins, JUnit and the GitHub Actions used
+in the workflows (`.github/dependabot.yml`). The `Dependabot auto-merge` workflow turns on
+auto-merge for them, so each one is squash-merged as soon as all required checks pass. One with
+a failing check stays open for a person to look at.
+
+This needs a one-time setup in the repository settings:
+
+1. **Settings > General > Pull Requests:** enable **Allow auto-merge**.
+2. **Settings > Rules > Rulesets > New ruleset > Import a ruleset:** import the three files in
+   `.github/rulesets/`:
+   - `main-history.json` keeps `main` safe for everyone, admins included: it cannot be deleted or
+     force-pushed, and history stays linear.
+   - `main-checks.json` requires changes to `main` to come through pull requests (no approval
+     needed) whose checks pass:
+     - `Build (Java 25, ubuntu-latest)`
+     - `Build (Java 25, windows-latest)`
+     - `Build (Java 25, macos-latest)`
+     - `GitHub Action self-test`
+
+     Repository admins bypass this ruleset, so the maintainer can push directly to `main`.
+     Dependabot and other contributors still go through pull requests and checks.
+   - `release-tags.json` protects `v*` tags: only repository admins can create, move or delete
+     them, because pushing one builds the installers and publishes a release.
+
+   Without required checks, GitHub has nothing to wait for and merges the update straight away.
+   If the CI matrix or a job name changes, update `main-checks.json` and the ruleset on GitHub, or pull
+   requests will wait forever for a check that never runs.
+
+Merges made by the workflow's token do not start new workflow runs, so CI does not run again on
+`main` after an automatic merge; it already ran on the pull request. To keep major version bumps
+for manual review, uncomment the condition in `.github/workflows/dependabot-auto-merge.yml`.
+
 ## Releasing
 
 1. Update the version in all `pom.xml` files (`mvn versions:set -DnewVersion=X.Y.Z`) and in

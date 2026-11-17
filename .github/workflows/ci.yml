@@ -16,6 +16,8 @@ permissions:
   contents: read
 
 jobs:
+  # The names of the build and action jobs are required checks in .github/rulesets/main-checks.json;
+  # keep the two in sync when changing the matrix or a job name.
   build:
     name: Build (Java ${{ matrix.java }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
