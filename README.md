@@ -353,7 +353,8 @@ if (!r.insights().newProblems().isEmpty()) {
 
 ## Contributing
 
-Bug reports, rule ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, rule ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

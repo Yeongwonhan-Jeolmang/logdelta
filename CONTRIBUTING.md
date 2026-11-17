@@ -1,7 +1,8 @@
 # Contributing to LogDelta
 
 Thanks for your interest! Bug reports, new built-in rules, and improvements to the engine or the UI
-are all welcome.
+are all welcome. Everyone taking part is expected to follow the
+[code of conduct](CODE_OF_CONDUCT.md).
 
 ## Getting started
 
