@@ -26,6 +26,9 @@ Please include:
 - a few **anonymised** lines from both logs that show the problem. `logdelta explain "<line>"`
   output is especially useful for rule problems.
 
+Security problems are the exception: report them privately as described in
+[SECURITY.md](SECURITY.md).
+
 ## Proposing a built-in rule
 
 Good built-in rules:
