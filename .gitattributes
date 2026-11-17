@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.gz binary
+# Example logs must stay byte-for-byte identical.
+examples/*.log -text
+logdelta-gui/src/main/resources/**/*.log -text
+*.ico  binary
+*.icns binary

@@ -1,0 +1,85 @@
+2026-11-10 09:14:02.000 INFO  [main] c.a.checkout.Application - Starting CheckoutService v2.8.3 using Java 25.0.1 with PID 48211
+2026-11-10 09:14:02.023 INFO  [main] c.a.checkout.Application - No active profile set, falling back to 1 default profile: "default"
+2026-11-10 09:14:02.383 INFO  [main] o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-11-10 09:14:02.395 INFO  [main] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-11-10 09:14:02.478 INFO  [main] com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@7513270e
+2026-11-10 09:14:02.485 INFO  [main] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-11-10 09:14:02.522 INFO  [main] c.a.checkout.metrics.Exporter - Metrics exporter connected to statsd:8125
+2026-11-10 09:14:02.531 INFO  [main] c.a.checkout.cache.PriceCache - Loading price cache...
+2026-11-10 09:14:02.942 INFO  [main] c.a.checkout.cache.PriceCache - Warmed price cache with 1204 entries in 411ms
+2026-11-10 09:14:02.982 INFO  [main] c.a.checkout.config.FeatureFlags - Feature flags loaded: express-checkout=on, split-payments=off
+2026-11-10 09:14:03.003 INFO  [main] c.a.checkout.Application - Started CheckoutService in 4.082 seconds (process running for 4.882)
+2026-11-10 09:14:03.244 INFO  [http-nio-8080-exec-9] c.a.checkout.api.OrderController - POST /api/orders from 10.0.0.24:56304 requestId=e246538b-3198-4537-9e76-fbc24ad50700 session=sess_AepfJBd0Kh8o
+2026-11-10 09:14:03.284 DEBUG [http-nio-8080-exec-9] c.a.checkout.service.OrderService - Validating cart for ORD-325127 with 1 items
+2026-11-10 09:14:03.418 DEBUG [http-nio-8080-exec-9] c.a.checkout.payment.PaymentClient - Charged ORD-325127 amount=36.83 currency=CAD
+2026-11-10 09:14:03.446 INFO  [http-nio-8080-exec-9] c.a.checkout.service.OrderService - Order ORD-325127 placed
+2026-11-10 09:14:03.463 INFO  [http-nio-8080-exec-9] c.a.checkout.api.OrderController - Responded 201 for requestId=e246538b-3198-4537-9e76-fbc24ad50700 in 96ms
+2026-11-10 09:14:03.706 INFO  [http-nio-8080-exec-1] c.a.checkout.api.OrderController - POST /api/orders from 10.0.1.76:56067 requestId=36459e0b-c684-48e4-87c0-123ef1814b99 session=sess_jIhKtJ0RlgLK
+2026-11-10 09:14:03.721 DEBUG [http-nio-8080-exec-1] c.a.checkout.service.OrderService - Validating cart for ORD-683705 with 2 items
+2026-11-10 09:14:03.851 DEBUG [http-nio-8080-exec-1] c.a.checkout.payment.PaymentClient - Charged ORD-683705 amount=195.22 currency=CAD
+2026-11-10 09:14:03.858 INFO  [http-nio-8080-exec-1] c.a.checkout.service.OrderService - Order ORD-683705 placed
+2026-11-10 09:14:03.864 INFO  [http-nio-8080-exec-1] c.a.checkout.api.OrderController - Responded 201 for requestId=36459e0b-c684-48e4-87c0-123ef1814b99 in 162ms
+2026-11-10 09:14:04.122 INFO  [http-nio-8080-exec-10] c.a.checkout.api.OrderController - POST /api/orders from 10.0.3.176:57911 requestId=4e61dfe5-7100-4324-8a27-91f9ec9c681d session=sess_BXuDL7DxtpYl
+2026-11-10 09:14:04.140 DEBUG [http-nio-8080-exec-10] c.a.checkout.service.OrderService - Validating cart for ORD-315963 with 3 items
+2026-11-10 09:14:04.238 DEBUG [http-nio-8080-exec-10] c.a.checkout.payment.PaymentClient - Charged ORD-315963 amount=46.83 currency=CAD
+2026-11-10 09:14:04.274 INFO  [http-nio-8080-exec-10] c.a.checkout.service.OrderService - Order ORD-315963 placed
+2026-11-10 09:14:04.298 INFO  [http-nio-8080-exec-10] c.a.checkout.api.OrderController - Responded 201 for requestId=4e61dfe5-7100-4324-8a27-91f9ec9c681d in 153ms
+2026-11-10 09:14:04.397 INFO  [http-nio-8080-exec-8] c.a.checkout.api.OrderController - POST /api/orders from 10.0.4.20:51134 requestId=d0167c0c-7a45-4654-8010-456c49795992 session=sess_GAkWvj7FAc9Q
+2026-11-10 09:14:04.435 DEBUG [http-nio-8080-exec-8] c.a.checkout.service.OrderService - Validating cart for ORD-401924 with 4 items
+2026-11-10 09:14:04.538 DEBUG [http-nio-8080-exec-8] c.a.checkout.payment.PaymentClient - Charged ORD-401924 amount=298.50 currency=CAD
+2026-11-10 09:14:04.563 INFO  [http-nio-8080-exec-8] c.a.checkout.service.OrderService - Order ORD-401924 placed
+2026-11-10 09:14:04.597 INFO  [http-nio-8080-exec-8] c.a.checkout.api.OrderController - Responded 201 for requestId=d0167c0c-7a45-4654-8010-456c49795992 in 166ms
+2026-11-10 09:14:04.824 INFO  [http-nio-8080-exec-10] c.a.checkout.api.OrderController - POST /api/orders from 10.0.3.19:62962 requestId=b5f2465b-9307-492c-84e6-dcf057795262 session=sess_f8rESQedUStP
+2026-11-10 09:14:04.855 DEBUG [http-nio-8080-exec-10] c.a.checkout.service.OrderService - Validating cart for ORD-935601 with 5 items
+2026-11-10 09:14:04.959 DEBUG [http-nio-8080-exec-10] c.a.checkout.payment.PaymentClient - Charged ORD-935601 amount=150.59 currency=CAD
+2026-11-10 09:14:04.963 INFO  [http-nio-8080-exec-10] c.a.checkout.service.OrderService - Order ORD-935601 placed
+2026-11-10 09:14:04.988 INFO  [http-nio-8080-exec-10] c.a.checkout.api.OrderController - Responded 201 for requestId=b5f2465b-9307-492c-84e6-dcf057795262 in 149ms
+2026-11-10 09:14:05.001 DEBUG [scheduling-1] c.a.checkout.health.Heartbeat - heartbeat ok
+2026-11-10 09:14:05.195 INFO  [http-nio-8080-exec-10] c.a.checkout.api.OrderController - POST /api/orders from 10.0.3.17:52775 requestId=a5fbf6ba-42dd-44fa-a493-fe069c1dcc03 session=sess_XsiVpzz63Ffk
+2026-11-10 09:14:05.223 DEBUG [http-nio-8080-exec-10] c.a.checkout.service.OrderService - Validating cart for ORD-222783 with 1 items
+2026-11-10 09:14:05.300 DEBUG [http-nio-8080-exec-10] c.a.checkout.payment.PaymentClient - Charged ORD-222783 amount=286.45 currency=CAD
+2026-11-10 09:14:05.330 INFO  [http-nio-8080-exec-10] c.a.checkout.service.OrderService - Order ORD-222783 placed
+2026-11-10 09:14:05.350 INFO  [http-nio-8080-exec-10] c.a.checkout.api.OrderController - Responded 201 for requestId=a5fbf6ba-42dd-44fa-a493-fe069c1dcc03 in 160ms
+2026-11-10 09:14:05.497 INFO  [http-nio-8080-exec-7] c.a.checkout.api.OrderController - POST /api/orders from 10.0.3.247:52980 requestId=1e593908-779c-4264-b3db-15920016b265 session=sess_jfljoQoaF1Ll
+2026-11-10 09:14:05.518 DEBUG [http-nio-8080-exec-7] c.a.checkout.service.OrderService - Validating cart for ORD-476198 with 2 items
+2026-11-10 09:14:05.631 DEBUG [http-nio-8080-exec-7] c.a.checkout.payment.PaymentClient - Charged ORD-476198 amount=7.28 currency=CAD
+2026-11-10 09:14:05.668 INFO  [http-nio-8080-exec-7] c.a.checkout.service.OrderService - Order ORD-476198 placed
+2026-11-10 09:14:05.707 INFO  [http-nio-8080-exec-7] c.a.checkout.api.OrderController - Responded 201 for requestId=1e593908-779c-4264-b3db-15920016b265 in 137ms
+2026-11-10 09:14:05.930 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - POST /api/orders from 10.0.4.245:59318 requestId=d1b3c1f5-fb6c-4071-b4a3-3bb7128f829a session=sess_PRVdD53X83RZ
+2026-11-10 09:14:05.958 DEBUG [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Validating cart for ORD-231587 with 3 items
+2026-11-10 09:14:06.068 DEBUG [http-nio-8080-exec-6] c.a.checkout.payment.PaymentClient - Charged ORD-231587 amount=208.61 currency=CAD
+2026-11-10 09:14:06.077 INFO  [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Order ORD-231587 placed
+2026-11-10 09:14:06.105 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - Responded 201 for requestId=d1b3c1f5-fb6c-4071-b4a3-3bb7128f829a in 151ms
+2026-11-10 09:14:06.278 INFO  [http-nio-8080-exec-1] c.a.checkout.api.OrderController - POST /api/orders from 10.0.0.55:56419 requestId=6973851e-9c5b-42be-a327-313b14c331c3 session=sess_khvMdgaKjIg8
+2026-11-10 09:14:06.282 DEBUG [http-nio-8080-exec-1] c.a.checkout.service.OrderService - Validating cart for ORD-299868 with 4 items
+2026-11-10 09:14:06.420 DEBUG [http-nio-8080-exec-1] c.a.checkout.payment.PaymentClient - Charged ORD-299868 amount=41.36 currency=CAD
+2026-11-10 09:14:06.447 INFO  [http-nio-8080-exec-1] c.a.checkout.service.OrderService - Order ORD-299868 placed
+2026-11-10 09:14:06.466 INFO  [http-nio-8080-exec-1] c.a.checkout.api.OrderController - Responded 201 for requestId=6973851e-9c5b-42be-a327-313b14c331c3 in 109ms
+2026-11-10 09:14:06.735 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - POST /api/orders from 10.0.2.123:51212 requestId=86b504b8-315d-4d13-acaf-6d6dbf8a9b7f session=sess_h2FDEEtfjgVv
+2026-11-10 09:14:06.754 DEBUG [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Validating cart for ORD-731535 with 5 items
+2026-11-10 09:14:06.834 DEBUG [http-nio-8080-exec-6] c.a.checkout.payment.PaymentClient - Charged ORD-731535 amount=250.98 currency=CAD
+2026-11-10 09:14:06.870 INFO  [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Order ORD-731535 placed
+2026-11-10 09:14:06.886 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - Responded 201 for requestId=86b504b8-315d-4d13-acaf-6d6dbf8a9b7f in 92ms
+2026-11-10 09:14:06.922 DEBUG [scheduling-1] c.a.checkout.health.Heartbeat - heartbeat ok
+2026-11-10 09:14:07.044 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - POST /api/orders from 10.0.4.236:49643 requestId=749d1b2e-aa76-4fb8-a3ce-67e11d1b741b session=sess_WHtP3fS2qHx6
+2026-11-10 09:14:07.069 DEBUG [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Validating cart for ORD-253723 with 1 items
+2026-11-10 09:14:07.197 DEBUG [http-nio-8080-exec-6] c.a.checkout.payment.PaymentClient - Charged ORD-253723 amount=400.38 currency=CAD
+2026-11-10 09:14:07.234 INFO  [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Order ORD-253723 placed
+2026-11-10 09:14:07.258 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - Responded 201 for requestId=749d1b2e-aa76-4fb8-a3ce-67e11d1b741b in 154ms
+2026-11-10 09:14:07.540 INFO  [http-nio-8080-exec-4] c.a.checkout.api.OrderController - POST /api/orders from 10.0.1.208:53122 requestId=f6911e46-efad-49a6-ab6f-5c958048370c session=sess_0zVZomHFwUbb
+2026-11-10 09:14:07.560 DEBUG [http-nio-8080-exec-4] c.a.checkout.service.OrderService - Validating cart for ORD-743016 with 2 items
+2026-11-10 09:14:07.644 DEBUG [http-nio-8080-exec-4] c.a.checkout.payment.PaymentClient - Charged ORD-743016 amount=246.43 currency=CAD
+2026-11-10 09:14:07.669 INFO  [http-nio-8080-exec-4] c.a.checkout.service.OrderService - Order ORD-743016 placed
+2026-11-10 09:14:07.694 INFO  [http-nio-8080-exec-4] c.a.checkout.api.OrderController - Responded 201 for requestId=f6911e46-efad-49a6-ab6f-5c958048370c in 147ms
+2026-11-10 09:14:07.941 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - POST /api/orders from 10.0.1.28:52916 requestId=90561f00-1d7f-428f-b0a2-56916c64ddf2 session=sess_EmvnEN5N1aE6
+2026-11-10 09:14:07.966 DEBUG [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Validating cart for ORD-184450 with 3 items
+2026-11-10 09:14:08.041 DEBUG [http-nio-8080-exec-6] c.a.checkout.payment.PaymentClient - Charged ORD-184450 amount=334.20 currency=CAD
+2026-11-10 09:14:08.068 INFO  [http-nio-8080-exec-6] c.a.checkout.service.OrderService - Order ORD-184450 placed
+2026-11-10 09:14:08.101 INFO  [http-nio-8080-exec-6] c.a.checkout.api.OrderController - Responded 201 for requestId=90561f00-1d7f-428f-b0a2-56916c64ddf2 in 115ms
+2026-11-10 09:14:08.188 INFO  [http-nio-8080-exec-3] c.a.checkout.api.OrderController - POST /api/orders from 10.0.2.24:62320 requestId=7671f846-4abf-41d6-bfc5-16d415c4e291 session=sess_8UzDzV8fUkki
+2026-11-10 09:14:08.200 DEBUG [http-nio-8080-exec-3] c.a.checkout.service.OrderService - Validating cart for ORD-555003 with 4 items
+2026-11-10 09:14:08.278 DEBUG [http-nio-8080-exec-3] c.a.checkout.payment.PaymentClient - Charged ORD-555003 amount=307.69 currency=CAD
+2026-11-10 09:14:08.311 INFO  [http-nio-8080-exec-3] c.a.checkout.service.OrderService - Order ORD-555003 placed
+2026-11-10 09:14:08.336 INFO  [http-nio-8080-exec-3] c.a.checkout.api.OrderController - Responded 201 for requestId=7671f846-4abf-41d6-bfc5-16d415c4e291 in 174ms
+2026-11-10 09:14:08.536 INFO  [SpringApplicationShutdownHook] c.a.checkout.Application - Shutting down gracefully
+2026-11-10 09:14:08.548 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.

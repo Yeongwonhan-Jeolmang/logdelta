@@ -1,0 +1,23 @@
+# Build output
+target/
+build/
+dist/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reports written while trying things out
+*.html
+!docs/**/*.html
+logdelta-report.*
+logdelta-junit.xml

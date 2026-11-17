@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.logdelta</groupId>
+        <artifactId>logdelta-parent</artifactId>
+        <version>1.1.0</version>
+    </parent>
+
+    <artifactId>logdelta-app</artifactId>
+    <name>LogDelta App</name>
+    <description>All-in-one executable jar: GUI by default, CLI when arguments are given.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.logdelta</groupId>
+            <artifactId>logdelta-cli</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.logdelta</groupId>
+            <artifactId>logdelta-gui</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- All modules have no third-party dependencies, so the all-in-one jar is a plain merge of
+                 the module jars. The assembly plugin copies classes without parsing bytecode, so it
+                 keeps working with every new class-file version. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>all-in-one</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>logdelta-${project.version}</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <archive>
+                                <manifest>
+                                    <mainClass>io.github.logdelta.app.Launcher</mainClass>
+                                </manifest>
+                                <manifestEntries>
+                                    <Implementation-Title>LogDelta</Implementation-Title>
+                                    <Implementation-Version>${project.version}</Implementation-Version>
+                                </manifestEntries>
+                            </archive>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

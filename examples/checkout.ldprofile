@@ -1,0 +1,26 @@
+# Example LogDelta profile for the checkout-service sample logs.
+# Use it with:  logdelta diff -p examples/checkout.ldprofile examples/baseline.log examples/candidate.log
+# Format reference: docs/PROFILES.md
+
+[options]
+algorithm = myers
+ignore-whitespace = true
+detect-moves = true
+
+[ignore]
+# Health-check noise is irrelevant to the comparison.
+pattern = Heartbeat - heartbeat ok
+
+[rule order-id]
+name = Order number
+category = identifier
+pattern = ORD-\d{6}
+replacement = ORD-<ID>
+description = Order numbers are generated per test run
+
+[rule amount]
+name = Payment amount
+category = metric
+pattern = (amount=)\d+\.\d{2}
+replacement = $1<AMOUNT>
+description = Cart totals are randomised by the load generator
