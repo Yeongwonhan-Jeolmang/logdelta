@@ -60,11 +60,11 @@
         <!-- Desktop tests that need a display are skipped while this is true; CI sets it to false
              and runs the build under a virtual display (xvfb-run). -->
         <logdelta.headless>true</logdelta.headless>
-        <jar-plugin.version>3.4.2</jar-plugin.version>
-        <assembly-plugin.version>3.7.1</assembly-plugin.version>
+        <jar-plugin.version>3.5.1</jar-plugin.version>
+        <assembly-plugin.version>3.8.0</assembly-plugin.version>
         <javadoc-plugin.version>3.12.0</javadoc-plugin.version>
         <source-plugin.version>3.4.0</source-plugin.version>
-        <enforcer-plugin.version>3.5.0</enforcer-plugin.version>
+        <enforcer-plugin.version>3.7.0</enforcer-plugin.version>
     </properties>
 
     <dependencyManagement>
