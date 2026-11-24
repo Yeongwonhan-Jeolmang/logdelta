@@ -11,10 +11,12 @@ import io.github.logdelta.cli.args.ParsedArgs;
 import io.github.logdelta.cli.render.Ansi;
 import io.github.logdelta.cli.render.Glyphs;
 import io.github.logdelta.core.engine.DiffOptions;
+import io.github.logdelta.core.engine.LogDeltaEngine;
+import io.github.logdelta.core.io.LogFile;
+import io.github.logdelta.core.model.ProcessedLine;
 import io.github.logdelta.core.normalize.Mask;
-import io.github.logdelta.core.normalize.NormalizedText;
-import io.github.logdelta.core.normalize.Normalizer;
 import io.github.logdelta.core.normalize.Rule;
+import io.github.logdelta.core.structured.StructuredLines;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -73,7 +75,6 @@ public final class ExplainCommand implements Command {
     @Override
     public int execute(ParsedArgs args, CliContext ctx) throws Exception {
         DiffOptions options = OptionSupport.buildOptions(args, ctx);
-        Normalizer normalizer = options.normalizer();
         Ansi ansi = Ansi.of(ctx.useColor(args.get("color", "auto")));
         Glyphs glyphs = Glyphs.of(ctx.unicode());
         List<String> lines = new ArrayList<>(args.positionals());
@@ -85,17 +86,24 @@ public final class ExplainCommand implements Command {
             }
         }
         PrintStream out = ctx.out();
-        for (String line : lines) {
-            explain(line, normalizer, options, ansi, glyphs, out);
+        // Prepare the lines like a comparison would, so JSON/logfmt lines and presets are explained
+        // as they are compared. Every line is explained, even one an ignore pattern would drop.
+        LogDeltaEngine.Prepared prepared = LogDeltaEngine.prepare(LogFile.ofLines("explain", lines),
+                options.toBuilder().ignorePatterns(List.of()).timeWindow(null).build());
+        if (prepared.detection().format().isStructured() || prepared.detection().preset() != null) {
+            out.println(ansi.dim("  format: " + prepared.detection().describe()));
+            out.println();
+        }
+        for (int i = 0; i < lines.size(); i++) {
+            explain(lines.get(i), prepared.lines().get(i), prepared.options(), ansi, glyphs, out);
         }
         return ExitCode.OK;
     }
 
-    private static void explain(String line, Normalizer normalizer, DiffOptions options, Ansi ansi, Glyphs glyphs,
+    private static void explain(String line, ProcessedLine n, DiffOptions options, Ansi ansi, Glyphs glyphs,
                                 PrintStream out) {
-        NormalizedText n = normalizer.normalize(line);
         out.println("  " + line);
-        if (n.masks().isEmpty()) {
+        if (n.masks().isEmpty() && n.key().equals(line)) {
             out.println(ansi.dim("  (no rule matched)"));
             out.println();
             return;
@@ -117,10 +125,14 @@ public final class ExplainCommand implements Command {
             Rule rule = options.rules().find(m.ruleId());
             String range = String.format("%-" + rangeWidth + "s", "[" + m.start() + ".." + m.end() + "]");
             String id = String.format("%-" + idWidth + "s", m.ruleId());
+            String what = rule != null ? rule.name()
+                    : m.ruleId().equals(StructuredLines.IGNORED_FIELD_RULE) ? "Ignored field (--compare-field to keep it)"
+                    : "";
             out.println("  " + ansi.cyan(range) + "  " + id + "  " + ansi.dim(glyphs.arrow()) + " "
-                    + String.format("%-12s", m.replacement()) + (rule == null ? "" : ansi.dim(rule.name())));
+                    + String.format("%-12s", m.replacement()) + ansi.dim(what));
         }
-        out.println("  " + ansi.dim("=") + " " + ansi.bold(normalizer.key(n)));
+        // Structured keys separate fields with U+001F; show them readably.
+        out.println("  " + ansi.dim("=") + " " + ansi.bold(n.key().replace("\u001f", "  ")));
         out.println();
     }
 }

@@ -11,6 +11,7 @@ import io.github.logdelta.core.model.DiffRow;
 import io.github.logdelta.core.model.DiffStats;
 import io.github.logdelta.core.util.Text;
 import io.github.logdelta.gui.theme.DiffPalette;
+import io.github.logdelta.gui.view.ProblemTimelineChart;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -34,6 +35,8 @@ import java.awt.RenderingHints;
 import java.awt.geom.Ellipse2D;
 import java.util.Locale;
 import java.util.function.IntConsumer;
+
+import static io.github.logdelta.gui.i18n.I18n.tr;
 
 /// Sidebar tab with the headline numbers of a comparison.
 public final class SummaryPanel extends JPanel {
@@ -62,7 +65,7 @@ public final class SummaryPanel extends JPanel {
         content.removeAll();
         content.setBorder(BorderFactory.createEmptyBorder(4, 14, 14, 14));
         if (r == null) {
-            JLabel empty = new JLabel("No comparison yet.");
+            JLabel empty = new JLabel(tr("No comparison yet."));
             empty.setBorder(BorderFactory.createEmptyBorder(16, 0, 0, 0));
             content.add(empty);
             content.revalidate();
@@ -72,71 +75,90 @@ public final class SummaryPanel extends JPanel {
         DiffStats s = r.stats();
         Insights in = r.insights();
 
-        content.add(Section.caption("Similarity"));
+        content.add(Section.caption(tr("Similarity")));
         JLabel pct = new JLabel(String.format(Locale.ROOT, "%.1f%%", s.similarity() * 100));
         pct.setFont(pct.getFont().deriveFont(Font.BOLD, 30f));
+        pct.getAccessibleContext().setAccessibleName(tr("Similarity") + " " + pct.getText());
         content.add(Section.compact(pct));
-        JLabel verdict = new JLabel(s.identical() ? (s.expected() > 0 ? "Only normal variation"
-                : "Identical after normalization")
-                : String.format(Locale.ROOT, "%,d of %,d compared lines differ", s.changes(),
-                s.unchanged() + s.changes()));
+        JLabel verdict = new JLabel(s.identical() ? (s.expected() > 0 ? tr("Only normal variation")
+                : tr("Identical after normalization"))
+                : tr("{0} of {1} compared lines differ", String.format(Locale.ROOT, "%,d", s.changes()),
+                String.format(Locale.ROOT, "%,d", s.unchanged() + s.changes())));
         content.add(Section.compact(verdict));
         content.add(Box.createVerticalStrut(8));
         content.add(Section.compact(new ProportionBar(s, palette)));
 
-        content.add(Section.caption("Changes"));
+        if (r.problemTimeline() != null && r.problemTimeline().hasProblems()) {
+            content.add(Section.caption(tr("Warnings and errors over time")));
+            ProblemTimelineChart chart = new ProblemTimelineChart(goToRow);
+            chart.setPalette(palette);
+            chart.setTimeline(r.problemTimeline());
+            content.add(Section.compact(chart));
+        }
+
+        content.add(Section.caption(tr("Changes")));
         JPanel counts = grid();
         int row = 0;
-        row = countRow(counts, row, palette.modifiedMarker(), "Modified", s.modified());
-        row = countRow(counts, row, palette.removedMarker(), "Removed", s.removed() - s.moved());
-        row = countRow(counts, row, palette.addedMarker(), "Added", s.added() - s.moved());
-        row = countRow(counts, row, palette.movedMarker(), "Moved", s.moved());
-        row = countRow(counts, row, palette.lineNumber(), "Unchanged", s.unchanged());
+        row = countRow(counts, row, palette.modifiedMarker(), tr("Modified"), s.modified());
+        row = countRow(counts, row, palette.removedMarker(), tr("Removed"), s.removed() - s.moved());
+        row = countRow(counts, row, palette.addedMarker(), tr("Added"), s.added() - s.moved());
+        row = countRow(counts, row, palette.movedMarker(), tr("Moved"), s.moved());
+        row = countRow(counts, row, palette.lineNumber(), tr("Unchanged"), s.unchanged());
         if (!r.extraBaselines().isEmpty()) {
-            countRow(counts, row, palette.lineNumber(), "Normal variation", s.expected());
+            countRow(counts, row, palette.lineNumber(), tr("Normal variation"), s.expected());
         }
         content.add(Section.compact(counts));
         if (!r.extraBaselines().isEmpty()) {
-            JLabel note = new JLabel("<html><div style='width:210px'>Also compared with " + r.extraBaselines().size() + " more baseline run"
-                    + (r.extraBaselines().size() == 1 ? "" : "s") + "; differences they share are shown faded "
-                    + "and marked \u2248.</div></html>");
+            JLabel note = new JLabel("<html><div style='width:210px'>" + tr("Also compared with {0} more "
+                    + "baseline run(s); differences they share are shown faded and marked \u2248.",
+                    r.extraBaselines().size()) + "</div></html>");
             note.setForeground(palette.lineNumber());
             content.add(Box.createVerticalStrut(6));
             content.add(Section.compact(note));
         }
 
-        content.add(Section.caption("Severity  (baseline → candidate)"));
+        content.add(Section.caption(tr("Severity  (baseline \u2192 candidate)")));
         JPanel sev = grid();
         int errL = in.leftCount(Severity.ERROR) + in.leftCount(Severity.FATAL);
         int errR = in.rightCount(Severity.ERROR) + in.rightCount(Severity.FATAL);
-        pairRow(sev, 0, "Errors", errL, errR);
-        pairRow(sev, 1, "Warnings", in.leftCount(Severity.WARN), in.rightCount(Severity.WARN));
-        pairRow(sev, 2, "New problems", 0, in.newProblems().size());
+        pairRow(sev, 0, tr("Errors"), errL, errR);
+        pairRow(sev, 1, tr("Warnings"), in.leftCount(Severity.WARN), in.rightCount(Severity.WARN));
+        pairRow(sev, 2, tr("New problems"), 0, in.newProblems().size());
         content.add(Section.compact(sev));
 
         if (in.firstDivergenceRow() >= 0) {
             DiffRow first = r.rows().get(in.firstDivergenceRow());
-            String where = (first.hasLeft() ? "line " + r.left(first).number() : "end") + " / "
-                    + (first.hasRight() ? "line " + r.right(first).number() : "end");
-            JButton jump = new JButton("Go to first difference (" + where + ")");
+            String where = (first.hasLeft() ? tr("line {0}", r.left(first).number()) : tr("end")) + " / "
+                    + (first.hasRight() ? tr("line {0}", r.right(first).number()) : tr("end"));
+            JButton jump = new JButton(tr("Go to first difference ({0})", where));
             jump.addActionListener(_ -> goToRow.accept(in.firstDivergenceRow()));
             content.add(Box.createVerticalStrut(12));
             content.add(Section.compact(jump));
         }
 
-        content.add(Section.caption("Files"));
+        content.add(Section.caption(tr("Files")));
         JPanel files = grid();
-        fileRows(files, 0, "Baseline", r.leftFile(), s.leftIgnored(), s.leftMasked());
-        fileRows(files, 3, "Candidate", r.rightFile(), s.rightIgnored(), s.rightMasked());
+        fileRows(files, 0, tr("Baseline"), r.leftFile(), s.leftIgnored(), s.leftMasked());
+        fileRows(files, 3, tr("Candidate"), r.rightFile(), s.rightIgnored(), s.rightMasked());
         content.add(Section.compact(files));
 
-        content.add(Section.caption("Comparison"));
+        content.add(Section.caption(tr("Comparison")));
         JPanel run = grid();
-        kv(run, 0, "Algorithm", r.options().algorithm().displayName() + (r.options().minimal() ? " (minimal)" : ""));
-        kv(run, 1, "Rules", r.options().rules().enabledRules().size() + " active");
-        kv(run, 2, "Ignore patterns", String.valueOf(r.options().ignorePatterns().size()));
-        kv(run, 3, "Time", r.elapsedMillis() + " ms");
-        kv(run, 4, "Stack traces", r.options().multilineEntries() ? "grouped with their line" : "line by line");
+        int y = 0;
+        String detected = RulesPanel.describe(r.detection());
+        if (!detected.isEmpty()) {
+            kv(run, y++, tr("Log format"), detected);
+        }
+        if (r.options().timeWindow() != null) {
+            kv(run, y++, tr("Time window"), r.options().timeWindow().describe());
+        }
+        kv(run, y++, tr("Algorithm"), r.options().algorithm().displayName()
+                + (r.options().minimal() ? " " + tr("(minimal)") : ""));
+        kv(run, y++, tr("Rules"), tr("{0} active", r.options().rules().enabledRules().size()));
+        kv(run, y++, tr("Ignore patterns"), String.valueOf(r.options().ignorePatterns().size()));
+        kv(run, y++, tr("Time"), r.elapsedMillis() + " ms");
+        kv(run, y, tr("Stack traces"), r.options().multilineEntries() ? tr("grouped with their line")
+                : tr("line by line"));
         content.add(Section.compact(run));
 
         content.revalidate();
@@ -201,9 +223,13 @@ public final class SummaryPanel extends JPanel {
         GridBagConstraints c = at(0, y);
         c.gridwidth = 2;
         p.add(name, c);
-        kv(p, y + 1, "", String.format(Locale.ROOT, "%,d lines · %s · %s%s", f.lineCount(),
-                Text.humanBytes(f.sizeBytes()), f.charset().name(), f.compressed() ? " · gzip" : ""));
-        kv(p, y + 2, "", String.format(Locale.ROOT, "%,d masked · %,d ignored", masked, ignored));
+        String window = f.window() == null ? "" : " \u00b7 " + tr("from line {0}",
+                String.format(Locale.ROOT, "%,d", f.firstLineNumber()));
+        kv(p, y + 1, "", tr("{0} lines", String.format(Locale.ROOT, "%,d", f.lineCount())) + " \u00b7 "
+                + Text.humanBytes(f.sizeBytes()) + " \u00b7 " + f.charset().name() + (f.compressed() ? " \u00b7 gzip" : "")
+                + window);
+        kv(p, y + 2, "", tr("{0} masked", String.format(Locale.ROOT, "%,d", masked)) + " \u00b7 "
+                + tr("{0} ignored", String.format(Locale.ROOT, "%,d", ignored)));
     }
 
     /// A filled circle used as a legend swatch.
@@ -237,7 +263,7 @@ public final class SummaryPanel extends JPanel {
             this.s = s;
             this.p = p;
             setPreferredSize(new Dimension(200, 8));
-            setToolTipText("Share of unchanged, modified, removed, moved and added rows");
+            setToolTipText(tr("Share of unchanged, modified, removed, moved and added rows"));
         }
 
         @Override

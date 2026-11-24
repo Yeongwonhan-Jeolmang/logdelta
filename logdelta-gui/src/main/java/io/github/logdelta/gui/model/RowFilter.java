@@ -57,7 +57,7 @@ final class RowFilter {
     }
 
     private static boolean isError(ProcessedLine line) {
-        return line != null && SeverityDetector.detect(line.text()).compareTo(Severity.ERROR) >= 0;
+        return line != null && SeverityDetector.detect(line).compareTo(Severity.ERROR) >= 0;
     }
 
     private static boolean contains(ProcessedLine line, String needle) {

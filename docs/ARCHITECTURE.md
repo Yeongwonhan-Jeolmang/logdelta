@@ -24,19 +24,22 @@ the JDK.
 
 | Package | Responsibility |
 |---|---|
-| `io` | `LogReader` (streaming read, gzip detection by magic bytes, BOM/UTF-8/Latin-1 detection), `LogFile`, and `LogSources` (paths and `http(s)` URLs, with size limits and headers) |
+| `io` | `LogReader` (streaming or memory-mapped read, gzip detection by magic bytes, BOM/UTF-8/Latin-1 detection, time-window slicing), `LogFile`, and `LogSources` (paths and `http(s)` URLs, with size limits and headers) |
+| `structured` | `LogFormat`, `StructuredParser` (JSON lines and logfmt, format detection), `FieldFilter` (ignored fields), `StructuredLines` (field changes, message/level/time fields) |
+| `preset` | `Presets`: built-in profiles for known formats, with detection |
+| `redact` | `Redactor` (secret detectors) and `Redaction` (re-mapping highlight ranges after removal) |
 | `normalize` | `Rule`, `RuleSet`, `BuiltinRules`, `Normalizer`, `LineFilter` |
 | `diff` | `MyersDiff`, `PatienceDiff`, `InlineDiff`, edit script types |
 | `model` | immutable result types: `ProcessedLine`, `DiffRow`, `RowKind`, `DiffStats`, `Hunk` |
 | `engine` | `LogDeltaEngine` (the pipeline), `DiffOptions`, `DiffResult`, line pairing, multi-line entries |
-| `analysis` | severity detection and `Insights` (new/resolved problems, frequency shifts) |
-| `timing` | `TimestampParser`, per-log `Timeline`s and `TimingAnalyzer` (slower and faster phases) |
+| `analysis` | severity detection and `Insights` (new/resolved problems, frequency shifts), `TemplateMiner` (message templates), flaky lines, `ProblemTimeline` |
+| `timing` | `TimestampParser`, per-log `Timeline`s, `TimingAnalyzer` (slower and faster phases) and `TimeWindow` (`--since`/`--until`) |
 | `suggest` | `RuleSuggester`: rules that would hide run-specific differences |
 | `folder` | `FolderComparer`: pairing files of two folders and comparing them in parallel |
 | `report` | HTML, JSON, Markdown, JUnit XML and unified writers; `FolderReports` |
 | `config` | profile file format (`ProfileIO`) |
 | `session` | session files (`SessionIO`, `Session`, `Bookmark`) |
-| `util` | progress/cancellation, a small JSON writer, text helpers |
+| `util` | progress/cancellation, a small JSON writer and parser, text helpers |
 
 ## The pipeline
 
@@ -44,10 +47,15 @@ the JDK.
 throughout.
 
 1. **Read.** `LogReader` streams the file (or a download) and splits lines on LF, CRLF and CR.
+   Files of 32 MB and more in UTF-8 or Latin-1 are memory-mapped in chunks instead. With a time
+   window, a slicer skips lines before `since` and stops reading after `until`.
+   **Detect.** A sample of lines decides the format (JSON lines or logfmt when 60 % parse) and the
+   preset (when 50 % match its signature); a preset's rules are added in front of the others.
 2. **Filter.** Lines matching an ignore pattern are dropped. Kept lines keep their original line
    numbers. Each kept line's timestamp is parsed (`TimestampParser`: ISO-8601, syslog, Apache,
    time of day, epoch) for the timing analysis.
-3. **Normalize.** For each line, `Normalizer` keeps a list of segments, each either untouched
+3. **Normalize.** Structured lines are first parsed into fields; ignored fields are masked as
+   `<IGNORED>` and the fields are sorted by name, so key order does not matter. For each line, `Normalizer` keeps a list of segments, each either untouched
    original text or a mask. Every enabled rule searches only the untouched segments, using
    *transparent bounds* so that `\b` and look-arounds still see the neighbouring characters.
    This gives three useful properties:
@@ -92,6 +100,11 @@ throughout.
 10. **Analyze.** `SeverityDetector` classifies lines by level keywords, structured `level=`
     fields and exception or stack-trace markers. `InsightAnalyzer` groups consecutive new or
     resolved problem rows and finds frequency shifts by counting comparison keys on both sides.
+    `TemplateMiner` groups messages into templates in two passes (tokens with digits become
+    `<*>`, then positions with at least three distinct words), and reports template shifts that
+    cover several variants. With extra baselines, rows that differ between good runs become
+    *flaky lines*, grouped by the rule (`RuleSuggester.rulesFor`) or ignore pattern that fixes
+    them. `ProblemTimeline` counts warnings and errors in 60 bins of time or position.
 11. **Timing.** `TimingAnalyzer` walks the unchanged rows that carry timestamps on both sides
     (the anchors) and compares the time between consecutive anchors. Stretches that changed by at
     least 250 ms (or 2% of the run) and by a factor of 1.5 become slower or faster phases.
@@ -100,6 +113,12 @@ throughout.
     is equal. A candidate rule is kept only if it has many distinct values (so it does not hide a
     real change such as an HTTP status) and, applied in a trial normalization, actually makes
     lines equal.
+
+Reports call `DiffResult.redacted(Redactor)` first, which returns a copy with secrets replaced
+and highlight and mask ranges re-mapped to the shorter text.
+
+For very large inputs, rows are stored in compact parallel arrays, `TokenWeights` is built from a
+sample, and `LinePairer` tokenizes lines lazily, only for change blocks it actually scores.
 
 `DiffResult` is immutable. The GUI's `DiffViewModel` maps result rows to visual rows (folds), and
 `SearchModel` finds matches in it. Neither modifies the result.
@@ -121,8 +140,13 @@ throughout.
 | `tour.Tour` | first-run tour: a glass pane with an animated spotlight and a card per step |
 | `util.AppIcon` | the application icon, drawn with Java 2D; also writes the installer icons |
 | `RuleEditorDialog` | rule list, form with live validation, tester |
-| `Theme`, `DiffPalette` | tuned Nimbus light/dark look and feel; diff colours |
-| `AppSettings` | Java Preferences plus the session profile |
+| `Theme`, `DiffPalette` | tuned Nimbus light/dark/high-contrast look and feel; diff colours, including colour-blind-safe variants |
+| `AppSettings` | Java Preferences plus the session profile and the reopened tabs |
+| `command.*` | `MenuCommands` (walks the menu bar), `CommandPalette`, `ShortcutsDialog`: both are built from the menus, so they never go out of date |
+| `i18n.I18n` | `tr("English {0}", args)`; translations in `messages_<lang>.properties` keyed by the English text |
+| `view.ProblemTimelineChart` | the problems-over-time chart in the Summary tab |
+| `util.UpdateChecker` | opt-in check of the latest GitHub release |
+| `SmokeTest` | `gui --smoke-test`: starts the real app and checks it end to end (CI, under Xvfb) |
 | `FileWatcher` | `WatchService` with a quiet period, for auto-reload |
 
 The canvas tracks the viewport width and draws both panes with one shared horizontal offset, so
@@ -148,7 +172,7 @@ engine runs on worker threads.
 
 ## Testing
 
-Each module has JUnit 5 tests (`mvn verify`). Highlights:
+Each module has JUnit 5 tests (`./mvnw verify`). Highlights:
 
 - the diff algorithms are checked against an LCS dynamic programme on hundreds of random inputs
   (minimality) and for script validity (each script must rebuild `b` from `a`);
@@ -159,3 +183,7 @@ Each module has JUnit 5 tests (`mvn verify`). Highlights:
 - JUnit XML output is parsed with the JDK's XML parser to prove it is well formed;
 - the GUI's models (folding, filtering, search, syntax colouring, pattern suggestions) are tested
   without a display.
+- every `tr(...)` text in the GUI must have a Korean translation with the same placeholders
+  (`I18nTest` scans the sources);
+- `MainFrameTest` builds the real window (under Xvfb in CI) and checks for duplicate shortcuts and
+  buttons without an accessible name, and `gui --smoke-test` runs the whole app once.

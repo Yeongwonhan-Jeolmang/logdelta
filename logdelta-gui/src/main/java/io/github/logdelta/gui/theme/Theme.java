@@ -19,11 +19,15 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/// Application themes. Light and dark are tuned variants of Nimbus (shipped with every JDK);
-/// [#SYSTEM] uses the platform look and feel with the light diff palette.
+/// Application themes. Light, dark and high contrast are tuned variants of Nimbus (shipped with
+/// every JDK); [#SYSTEM] uses the platform look and feel with the light diff palette.
+///
+/// Every theme except [#HIGH_CONTRAST] has a colour-blind-safe variant of its diff palette (see
+/// [#palette(boolean)]).
 public enum Theme {
     LIGHT("Light"),
     DARK("Dark"),
+    HIGH_CONTRAST("High contrast"),
     SYSTEM("System");
 
     private static final List<String> MONO_FONTS = List.of("JetBrains Mono", "Cascadia Mono", "Cascadia Code",
@@ -40,14 +44,30 @@ public enum Theme {
         this.displayName = displayName;
     }
 
-    /// Name shown in menus.
+    /// Name shown in menus, in the active language.
     public String displayName() {
-        return displayName;
+        return io.github.logdelta.gui.i18n.I18n.tr(displayName);
     }
 
     /// Colours for the comparison view.
     public DiffPalette palette() {
-        return this == DARK ? DiffPalette.DARK : DiffPalette.LIGHT;
+        return palette(false);
+    }
+
+    /// Colours for the comparison view.
+    ///
+    /// @param colorBlindSafe use colours that stay distinct with red-green colour blindness
+    public DiffPalette palette(boolean colorBlindSafe) {
+        return switch (this) {
+            case DARK -> colorBlindSafe ? DiffPalette.DARK_CVD : DiffPalette.DARK;
+            case HIGH_CONTRAST -> DiffPalette.HIGH_CONTRAST;
+            case LIGHT, SYSTEM -> colorBlindSafe ? DiffPalette.LIGHT_CVD : DiffPalette.LIGHT;
+        };
+    }
+
+    /// Whether the theme has dark backgrounds.
+    public boolean isDark() {
+        return this == DARK || this == HIGH_CONTRAST;
     }
 
     /// Parses a stored name, falling back to [#LIGHT].
@@ -70,6 +90,8 @@ public enum Theme {
                 resetNimbusColors();
                 if (this == DARK) {
                     applyDarkNimbus();
+                } else if (this == HIGH_CONTRAST) {
+                    applyHighContrastNimbus();
                 } else {
                     applyLightNimbus();
                 }
@@ -140,6 +162,32 @@ public enum Theme {
         put("ToolTip.foreground", 0xDFE1E5);
     }
 
+    private static void applyHighContrastNimbus() {
+        put("control", 0x000000);
+        put("info", 0x000000);
+        put("nimbusBase", 0x000000);
+        put("nimbusBlueGrey", 0x5A5A5A);
+        put("nimbusLightBackground", 0x000000);
+        put("nimbusSelectionBackground", 0x00007A);
+        put("nimbusSelectedText", 0xFFFFFF);
+        put("nimbusFocus", 0xFFFF00);
+        put("nimbusDisabledText", 0xA0A0A0);
+        put("nimbusInfoBlue", 0x00A0FF);
+        put("nimbusAlertYellow", 0xFFFF00);
+        put("nimbusRed", 0xFF5050);
+        put("nimbusOrange", 0xFF9900);
+        put("nimbusGreen", 0x50FF80);
+        put("nimbusBorder", 0xFFFFFF);
+        put("text", 0xFFFFFF);
+        put("menuText", 0xFFFFFF);
+        put("textForeground", 0xFFFFFF);
+        put("infoText", 0xFFFFFF);
+        put("Table.alternateRowColor", 0x141414);
+        put("Table.gridColor", 0x808080);
+        put("ToolTip.background", 0x000000);
+        put("ToolTip.foreground", 0xFFFFFF);
+    }
+
     private static void put(String key, int rgb) {
         UIManager.put(key, new ColorUIResource(new Color(rgb)));
     }
@@ -152,12 +200,26 @@ public enum Theme {
         return new Font(monoFamily, Font.PLAIN, Math.round(size)).deriveFont(size);
     }
 
-    /// The best available UI font at the given size.
+    /// The best available UI font at the given size. When the preferred fonts cannot show the
+    /// interface language (Korean, for example), Java's logical "Dialog" font is used instead: it
+    /// falls back to other installed fonts glyph by glyph.
     public static Font uiFont(float size) {
         if (uiFamily == null) {
             uiFamily = pick(UI_FONTS, Font.SANS_SERIF);
+            String sample = languageSample(io.github.logdelta.gui.i18n.I18n.language());
+            if (sample != null && new Font(uiFamily, Font.PLAIN, 13).canDisplayUpTo(sample) >= 0) {
+                uiFamily = Font.DIALOG;
+            }
         }
         return new Font(uiFamily, Font.PLAIN, Math.round(size)).deriveFont(size);
+    }
+
+    /// Characters a UI font must be able to show for a language, or `null` for Latin scripts.
+    static String languageSample(String language) {
+        return switch (language) {
+            case "ko" -> "\uD55C\uAD6D\uC5B4\uADDC\uCE59";
+            default -> null;
+        };
     }
 
     private static String pick(List<String> preferred, String fallback) {

@@ -6,6 +6,61 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-23
+
+### Added
+- **Structured logs.** JSON lines and logfmt are detected and compared field by field: key order
+  no longer matters, changed fields are listed (`@@ field changes @@` in Markdown, a tooltip in
+  the app, `rows[].fieldChanges` in JSON) and timestamps and trace/span ids are ignored by
+  default (`--log-format`, `--ignore-field`, `--compare-field`; `log-format` and `ignore-fields`
+  in profiles).
+- **Built-in presets** for Spring Boot, nginx/Apache access logs, Kubernetes/containerd,
+  journald/syslog, Android logcat and Python logging, detected automatically (`--preset`,
+  `logdelta rules --presets`). Each preset's rules can be switched off individually.
+- **Message templates.** Lines are grouped into templates (`Connection to <*> failed`), so a
+  change in how often a kind of message occurs is reported once, not once per value.
+- **Flaky lines.** With several good runs, lines that vary between them are listed with a
+  suggested mask or ignore rule; one click applies it in the app.
+- **Secret redaction.** Exported reports remove passwords, tokens, API keys (AWS, GitHub,
+  GitLab, Slack, Google, Stripe, npm, OpenAI-style), JWTs, private keys, credentials in URLs and
+  e-mail addresses. On by default for reports; `--no-redact` and `--redact REGEX` adjust it,
+  `logdelta rules --redaction` lists the detectors.
+- **Time windows.** `--since` and `--until` compare only part of each run (absolute times, time
+  of day, or `+5m` from the first line); reading stops at the end of the window.
+- **Error-over-time chart** in the app's summary, the HTML report and as a sparkline in the
+  terminal and Markdown summary (`problemTimeline` in JSON).
+- **Command palette** (Ctrl+Shift+P / ⌘⇧P) that runs any menu command by name, and a
+  **keyboard shortcut reference** (Help > Keyboard Shortcuts) built from the menus.
+- **Reopen tabs at start.** The app restores the previous session's tabs, rules and bookmarks.
+- **Accessibility:** a colour-blind-safe palette, a high-contrast theme and screen-reader names
+  for the comparison view, buttons and charts.
+- **Korean translation**; the app's texts come from resource bundles (View > Language).
+- **Opt-in update check** against GitHub Releases (Help > Check for Updates).
+- **Shell completions** for bash, zsh, fish and PowerShell (`logdelta completion SHELL`) and a
+  **man page** (`logdelta manpage`), installed by the .deb package and shipped with the others.
+- **Automatic profiles.** A `.logdelta` file (or `.logdelta/profile.ldprofile`) in the working
+  folder or a parent, up to the repository root, is used automatically (`--no-profile`, or
+  `LOGDELTA_AUTO_PROFILE=0`, turns it off).
+- Maven wrapper (`./mvnw`), YAML issue forms, release-note categories and a GUI smoke test
+  (`logdelta gui --smoke-test`).
+
+### Changed
+- **Large files** are memory-mapped and processed in compact form: two 300 MB logs compare in a
+  few minutes with a 4 GB heap. Installed launchers use up to 75 % of the machine's memory.
+- Lines that differ only in numbers are paired as modified lines more often.
+- Reports are redacted by default, and so are `check` output (CI logs are often public) and
+  terminal views written to a file with `-o`; terminal output is not.
+- `normalize` and `explain` prepare lines exactly like a comparison (time window, JSON/logfmt
+  fields, presets).
+- Report and `-o` files are written into folders that don't exist yet.
+- JSON reports have new fields (`detected`, `problemTimeline`, `redactedSecrets`,
+  `insights.templateShifts`, `insights.flakyLines`, `occurrences` on problems, `fieldChanges` on
+  rows, `firstLine` on each input, and `options.logFormat`, `preset`, `ignoreFields` and
+  `timeWindow`); the schema version stays 1.
+- Profiles accept `log-format`, `ignore-fields`, `preset`, `since`, `until`, `redact` and a
+  `[redact]` section.
+- CI: job time limits, a concurrency group, grouped Dependabot updates, GUI tests under Xvfb.
+
 ## [1.1.0] - 2026-11-17
 
 ### Added
@@ -62,6 +117,7 @@ All notable changes to this project are documented here. The format follows
   variables, sequenced collections and a virtual thread for file watching.
 - API documentation written as Markdown doc comments (`///`).
 
-[Unreleased]: https://github.com/Yeongwonhan-Jeolmang/logdelta/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/Yeongwonhan-Jeolmang/logdelta/compare/v1.0.0...v1.1.0
+[Unreleased]: https://github.com/Yeongwonhan-Jeolmang/logdelta/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/Yeongwonhan-Jeolmang/logdelta/compare/v.1.1.0...v2.0.0
+[1.1.0]: https://github.com/Yeongwonhan-Jeolmang/logdelta/compare/v1.0.0...v.1.1.0
 [1.0.0]: https://github.com/Yeongwonhan-Jeolmang/logdelta/releases/tag/v1.0.0

@@ -1,13 +1,13 @@
 # Desktop app guide
 
-Start the app from the installer's menu entry, or with `java -jar logdelta-1.1.0.jar` (or
+Start the app from the installer's menu entry, or with `java -jar logdelta-2.0.0.jar` (or
 double-click the jar). To open something right away:
 
 ```sh
-java -jar logdelta-1.1.0.jar gui baseline.log candidate.log            # two logs
-java -jar logdelta-1.1.0.jar gui good-1.log good-2.log candidate.log   # several good runs
-java -jar logdelta-1.1.0.jar gui logs/release-41 logs/release-42       # two folders
-java -jar logdelta-1.1.0.jar gui review.ldsession                      # a saved session
+java -jar logdelta-2.0.0.jar gui baseline.log candidate.log            # two logs
+java -jar logdelta-2.0.0.jar gui good-1.log good-2.log candidate.log   # several good runs
+java -jar logdelta-2.0.0.jar gui logs/release-41 logs/release-42       # two folders
+java -jar logdelta-2.0.0.jar gui review.ldsession                      # a saved session
 ```
 
 On the first start a short tour points out the main parts of the window: the window is dimmed
@@ -124,6 +124,13 @@ The find bar searches the text that is displayed (original or normalized), suppo
 expressions (`.*`) and case-sensitive matching (`Aa`), and expands collapsed regions to show a
 match. **Help > Keyboard Shortcuts** (F1) lists every shortcut.
 
+### Command palette
+
+**Ctrl+Shift+P** (⌘⇧P on macOS, or **Help > Command Palette**) opens a search box over every
+menu command. Type a few letters of a command's name or its menu (`dark`, `exp html`, `wrap`),
+use ↑/↓ and press Enter. Shortcuts and on/off states are shown next to each entry; recently used
+commands come first.
+
 ## View options
 
 - **Pane Widths**: widen either side or restore equal widths. You can also drag the divider
@@ -135,7 +142,12 @@ match. **Help > Keyboard Shortcuts** (F1) lists every shortcut.
 - **Wrap Long Lines** (Alt+Z) breaks long lines instead of scrolling sideways; each row grows
   to fit the longer of its two lines.
 - **Syntax Colouring** and **Show Elapsed Time**, described above.
-- **Theme**: Light, Dark, or System (the platform look and feel). Themes switch immediately.
+- **Theme**: Light, Dark, High Contrast, or System (the platform look and feel). Themes switch
+  immediately.
+- **Colour-Blind-Safe Colours** replaces red/green with blue/orange for removed and added lines,
+  so changes stay distinct with red-green colour blindness. Changes are also marked with
+  symbols (`-`, `+`, `~`, `↕`) in the gutter, never by colour alone.
+- **Language**: English or 한국어 (Korean); used after the next start.
 
   ![Dark theme](images/main-dark.png)
 
@@ -158,8 +170,10 @@ match. **Help > Keyboard Shortcuts** (F1) lists every shortcut.
 ## The sidebar
 
 **Summary**: similarity, a bar with the share of each kind of change, counts (including normal
-variation), errors and warnings before and after, file details, and a button to jump to the first
-difference.
+variation), errors and warnings before and after, the detected log format, file details, and a
+button to jump to the first difference. The **problems over time** chart shows warnings and
+errors along each run (by timestamp, or by position when there are none); a burst in the
+candidate that the baseline doesn't have is easy to spot. Click a bar to jump there.
 
 **Insights**: the fastest way to answer "what broke?"
 
@@ -167,7 +181,9 @@ difference.
   candidate. Consecutive problem lines are grouped, so a stack trace is one entry.
 - *Resolved problems*: problems that no longer appear.
 - *Frequency shifts*: messages whose number of occurrences changed sharply. They often point
-  at retry loops or a cache that stopped working.
+  at retry loops or a cache that stopped working. Messages that differ only in values are
+  grouped into a template (marked `≈`, varying parts shown as `<*>`), so 200 retries for 200
+  different orders are one entry, not 200. A problem that occurs many times shows `×N`.
 
 ![Timing tab and wrapped lines](images/timing.png)
 
@@ -176,7 +192,8 @@ stretch between two lines that match on both sides, for example "Validating cart
 …": `132 ms → 15.1 s` is hard to miss. Phases are reported when they changed by at least 250 ms
 and by a factor of 1.5.
 
-**Rules**: suggested rules, comparison options (ignore case, ignore whitespace, detect moves,
+**Rules**: suggested rules, flaky lines, the **log format** (auto-detected format and preset,
+ignored fields for JSON/logfmt, and a time window), comparison options (ignore case, ignore whitespace, detect moves,
 stack traces, algorithm), the rule list with on/off switches, and ignore patterns. Every change
 re-compares automatically after a short pause.
 
@@ -192,6 +209,17 @@ of `session`". Hover it to see the pattern and an example; **Apply** adds the ru
 is gone. The Rules tab title shows • while there are suggestions.
 
 ![A suggested rule and a bookmark](images/suggestions-bookmarks.png)
+
+With more than one good run, the Rules tab also lists **flaky lines**: lines that already differ
+between your good runs (a PID, a port, a line that is only sometimes there). Each has a
+**Mask** or **Ignore** button with the rule that fixes it and all similar lines.
+
+**Structured logs.** For JSON lines and logfmt, fields are compared by name, whatever their
+order. Hover a modified line to see which fields changed (`status: 200 → 502`). Timestamps and
+trace ids are ignored; edit **Ignored fields** in the Rules tab to change that.
+
+**Time window.** Enter `+2m` and `+5m` under **Log format** to compare only minutes two to five
+of each run, or absolute times like `08:49`.
 
 For other noise:
 
@@ -258,7 +286,19 @@ diff. HTML exports include the collapsed unchanged regions. **File > Copy Summar
 
 Copy single lines with Ctrl+C (candidate side), or via the Edit and context menus.
 
+Exports have secrets removed (passwords, tokens, API keys, credentials in URLs, e-mail
+addresses); the status bar says how many. Switch it off with **File > Export > Remove Secrets
+from Exports** if you need the raw text. The view itself is never changed.
+
 ## Settings
+
+**Reopen tabs at start** (File menu, on by default): the tabs that were open when you quit,
+with their rules, bookmarks and notes, come back on the next start. Tabs are stored as session
+files in `~/.logdelta/open-tabs/`.
+
+**Check for updates** (Help menu) asks GitHub whether a newer release exists. **Check
+Automatically** does that at most once a day at start; it is off until you switch it on, and
+nothing but the request for the latest release is sent.
 
 Window size, theme, font size, folding, wrapping, colouring, the elapsed-time column, the last
 folder and recent comparisons are remembered with Java Preferences. The active options and rules
@@ -267,5 +307,14 @@ are stored as a normal profile in `~/.logdelta/session.ldprofile`.
 ## Large files
 
 Comparisons run in the background with a progress bar and a **Cancel** button. Only visible rows
-are painted, so scrolling stays smooth for very large files. If memory runs out, start the app
-with a bigger heap: `java -Xmx4g -jar logdelta-1.1.0.jar`.
+are painted, so scrolling stays smooth for very large files. Big files are memory-mapped and
+kept in compact form; the installed app uses up to 75 % of the computer's memory. With the jar,
+give it more if memory runs out: `java -Xmx4g -jar logdelta-2.0.0.jar`. A time window (Rules >
+Log format) makes huge logs quick, because reading stops at the end of the window.
+
+## Accessibility
+
+- Every button, the comparison view and the charts have names for screen readers; moving the
+  selection in the comparison announces the row (`Row 12 of 340, Modified, …`).
+- The **High Contrast** theme and **Colour-Blind-Safe Colours** are in the View menu.
+- Everything is reachable from the keyboard; the command palette finds any command by name.

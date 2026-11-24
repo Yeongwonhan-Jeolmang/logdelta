@@ -6,13 +6,14 @@ are all welcome. Everyone taking part is expected to follow the
 
 ## Getting started
 
-Requirements: JDK 25+ and Maven 3.9+.
+Requirements: JDK 25+. Maven is optional: `./mvnw` (or `mvnw.cmd` on Windows) downloads the
+version the project uses.
 
 ```sh
 git clone https://github.com/Yeongwonhan-Jeolmang/logdelta.git
 cd logdelta
-mvn verify                                        # build and run all tests
-java -jar logdelta-app/target/logdelta-1.1.0.jar  # try it
+./mvnw verify                                     # build and run all tests
+java -jar logdelta-app/target/logdelta-2.0.0.jar  # try it
 ```
 
 The modules are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Most changes touch
@@ -53,6 +54,25 @@ Add the rule to `BuiltinRules` in the right order, add positive and negative exa
 - Keep `logdelta-core` free of UI code and dependencies.
 - Swing code runs on the event dispatch thread; long work goes through `ComparisonController`.
 - Tests use JUnit 5 with `@DisplayName` sentences that describe the behaviour.
+- Tests that need a real display call `Assumptions.assumeFalse(GraphicsEnvironment.isHeadless())`.
+  They are skipped in a normal `./mvnw verify` (`java.awt.headless` defaults to `true`); CI runs
+  them on Linux with `xvfb-run -a ./mvnw verify -Dlogdelta.headless=false`, followed by
+  `java -jar logdelta-app/target/logdelta-*.jar gui --smoke-test`.
+
+## Translations
+
+Every text the desktop app shows goes through `I18n.tr("English text {0}", args)`; the English
+text is the key. Translations live in
+`logdelta-gui/src/main/resources/io/github/logdelta/gui/i18n/messages_<lang>.properties`
+(UTF-8). When you add or change a text:
+
+- wrap it in `tr(...)` with a string literal (not a variable), so it can be found;
+- add the Korean translation to `messages_ko.properties`, keeping the `{0}` placeholders.
+  `I18nTest` fails when a `tr` text has no translation or the placeholders differ. If you
+  can't translate it, say so in the pull request and a maintainer will help.
+
+To add a language, copy `messages_ko.properties`, translate the values and add the language to
+`I18n.LANGUAGES`. Command-line output and reports are English only.
 
 ## License of contributions
 
@@ -68,7 +88,7 @@ with the same SPDX header as the existing ones:
 
 1. Create a branch from `main`.
 2. Keep changes focused, and add or update tests and documentation.
-3. Run `mvn verify` and make sure it passes.
+3. Run `./mvnw verify` and make sure it passes.
 4. Describe what changed and why in the pull request, with screenshots for UI changes.
 
 ## Dependency updates
@@ -107,7 +127,8 @@ for manual review, uncomment the condition in `.github/workflows/dependabot-auto
 
 ## Releasing
 
-1. Update the version in all `pom.xml` files (`mvn versions:set -DnewVersion=X.Y.Z`) and in
+1. Update the version in all `pom.xml` files (`./mvnw versions:set -DnewVersion=X.Y.Z`) and in
    `io.github.logdelta.core.Version`.
 2. Move the "Unreleased" notes in `CHANGELOG.md` under the new version.
-3. Tag `vX.Y.Z`. CI builds the jar, which is attached to the GitHub release.
+3. Tag `vX.Y.Z` (with the `v` directly before the number; release notes are grouped by the
+   labels in `.github/release.yml`). CI builds the jar, which is attached to the GitHub release.

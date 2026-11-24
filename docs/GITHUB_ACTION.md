@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: ./run-integration-tests.sh > build/app.log 2>&1
-      - uses: Yeongwonhan-Jeolmang/logdelta@v1.1.0
+      - uses: Yeongwonhan-Jeolmang/logdelta@v2.0.0
         with:
           baseline: tests/expected/app.log
           candidate: build/app.log
@@ -79,7 +79,7 @@ from untrusted pull-request content.
 sometimes appears) does not fail the job:
 
 ```yaml
-      - uses: Yeongwonhan-Jeolmang/logdelta@v1.1.0
+      - uses: Yeongwonhan-Jeolmang/logdelta@v2.0.0
         with:
           baseline: |
             tests/expected/run-1.log
@@ -97,7 +97,7 @@ baseline, and every passing run on `main` adds itself.
           path: .logdelta/runs
           key: logdelta-runs-${{ github.run_id }}
           restore-keys: logdelta-runs-
-      - uses: Yeongwonhan-Jeolmang/logdelta@v1.1.0
+      - uses: Yeongwonhan-Jeolmang/logdelta@v2.0.0
         with:
           baseline-dir: .logdelta/runs
           candidate: build/app.log
@@ -108,7 +108,7 @@ baseline, and every passing run on `main` adds itself.
 **Folders.** Compare every log a test suite wrote:
 
 ```yaml
-      - uses: Yeongwonhan-Jeolmang/logdelta@v1.1.0
+      - uses: Yeongwonhan-Jeolmang/logdelta@v2.0.0
         with:
           baseline: tests/expected/logs
           candidate: build/logs
@@ -118,7 +118,7 @@ baseline, and every passing run on `main` adds itself.
 **Test reports.** Feed the JUnit file to a reporter so each new problem shows as a failed test:
 
 ```yaml
-      - uses: Yeongwonhan-Jeolmang/logdelta@v1.1.0
+      - uses: Yeongwonhan-Jeolmang/logdelta@v2.0.0
         id: logdelta
         with: { baseline: tests/expected/app.log, candidate: build/app.log, fail: 'false' }
       - uses: mikepenz/action-junit-report@v4

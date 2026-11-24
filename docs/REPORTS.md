@@ -72,6 +72,23 @@ removals are listed before all additions. Hunk headers use original line numbers
 patterns removed lines, the counts may not add up to the line-number gap, so the output is meant
 for reading, not for `patch`.
 
+## Secrets in reports
+
+Every exported report (HTML, Markdown, JSON, JUnit, unified diff, folder reports, `check`
+annotations and job summaries) passes through the redactor first. It replaces passwords,
+`Authorization` headers, bearer tokens, JWTs, private-key blocks, credentials in URLs,
+`password=`/`secret=`/`token=`/`api_key=` values, cloud and SaaS keys (AWS, GitHub, GitLab, Slack,
+Google, Stripe, npm, `sk-…`) and e-mail addresses with `[REDACTED]`, and says how many were
+removed. Terminal output and the app's own view are not changed.
+
+- `--no-redact` (or `redact = false` in a profile, or **Export > Remove Secrets from Exports**
+  in the app) turns the built-in detectors off.
+- `--redact REGEX` (repeatable, or `[redact]` `pattern = …` lines in a profile) adds your own;
+  they apply even with `--no-redact`.
+- `logdelta rules --redaction` lists the detectors.
+
+Redaction is a safety net, not a guarantee: review a report before you publish it.
+
 ## JSON
 
 Stable, versioned output for automation. Example (abridged):
@@ -79,16 +96,19 @@ Stable, versioned output for automation. Example (abridged):
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "LogDelta", "version": "1.1.0" },
-  "left":  { "name": "baseline.log", "path": "/runs/1/baseline.log", "lines": 83, "bytes": 11582, "charset": "UTF-8", "gzip": false },
-  "right": { "name": "candidate.log", "path": "/runs/2/candidate.log", "lines": 101, "bytes": 14432, "charset": "UTF-8", "gzip": false },
+  "tool": { "name": "LogDelta", "version": "2.0.0" },
+  "left":  { "name": "baseline.log", "path": "/runs/1/baseline.log", "lines": 83, "bytes": 11582, "charset": "UTF-8", "gzip": false, "firstLine": 1 },
+  "right": { "name": "candidate.log", "path": "/runs/2/candidate.log", "lines": 101, "bytes": 14432, "charset": "UTF-8", "gzip": false, "firstLine": 1 },
   "extraBaselines": [ { "name": "baseline-2.log", "path": "/runs/0/baseline-2.log", "lines": 85 } ],
   "options": {
     "algorithm": "myers", "minimal": false, "ignoreCase": false, "ignoreWhitespace": true, "detectMoves": true,
-    "multilineEntries": false,
+    "multilineEntries": false, "logFormat": "auto", "preset": "auto",
+    "ignoreFields": ["@timestamp", "timestamp", "time", "ts", "..."],
+    "timeWindow": { "since": "+2m", "until": null },
     "ignorePatterns": ["Heartbeat - heartbeat ok"],
     "enabledRules": ["order-id", "amount", "iso-timestamp", "..."]
   },
+  "detected": { "format": "plain", "preset": "spring-boot" },
   "stats": {
     "identical": false, "similarity": 0.5604, "unchanged": 51, "modified": 21, "removed": 11, "added": 27,
     "moved": 0, "expected": 2, "leftIgnored": 2, "rightIgnored": 2, "leftMasked": 83, "rightMasked": 94,
@@ -97,12 +117,23 @@ Stable, versioned output for automation. Example (abridged):
   "insights": {
     "firstDivergence": { "row": 0, "leftLine": 1, "rightLine": 1 },
     "newProblems": [
-      { "line": 44, "severity": "ERROR", "text": "2026-11-11 22:41:37.919 WARN ...", "groupedLines": 9 }
+      { "line": 44, "severity": "ERROR", "text": "2026-11-11 22:41:37.919 WARN ...", "groupedLines": 9, "occurrences": 15 }
     ],
     "resolvedProblems": [],
     "severity": { "error": { "left": 0, "right": 10 }, "warn": { "left": 0, "right": 16 }, "...": {} },
     "frequencyShifts": [
       { "template": "<TIMESTAMP> ERROR [...] Order ORD-<ID> could not be charged", "left": 0, "right": 5, "delta": 5 }
+    ],
+    "templateShifts": [
+      { "template": "Payment gateway call failed (attempt <*> Read timed out after <DURATION>",
+        "severity": "WARN", "left": 0, "right": 15, "delta": 15, "variants": 3 }
+    ],
+    "flakyLines": [
+      {
+        "kind": "values", "line": 1, "text": "... Starting CheckoutService v2.8.3 ... with PID 48211",
+        "varyingRuns": 1, "totalRuns": 2, "similarLines": 0,
+        "rules": [ { "id": "number-after-pid", "pattern": "(\\bPID\\s+)\\d+(?:\\.\\d+)?\\b", "replacement": "$1<N>" } ]
+      }
     ]
   },
   "timing": {
@@ -116,12 +147,18 @@ Stable, versioned output for automation. Example (abridged):
     ],
     "faster": []
   },
+  "problemTimeline": {
+    "byTime": true, "spanMillis": 83101,
+    "left":  { "warnings": [0, 0, "... 60 bins"], "errors": [0, 0, "..."] },
+    "right": { "warnings": [0, 3, "..."], "errors": [0, 1, "..."] }
+  },
   "suggestedRules": [
     {
       "id": "mask-session", "summary": "differ only in the value of `session`",
       "pattern": "(\\bsession\\s*[=:]\\s*[\"']?)[^\\s,;\"')\\]}]+", "replacement": "$1<SESSION>", "resolves": 14
     }
   ],
+  "redactedSecrets": 0,
   "hunks": [
     {
       "rows": [
@@ -130,7 +167,11 @@ Stable, versioned output for automation. Example (abridged):
           "left":  { "line": 1, "text": "... v2.8.3 ... PID 48211", "normalized": "<TIMESTAMP> ...", "changed": [[78, 84]] },
           "right": { "line": 1, "text": "... v2.8.4 ... PID 51907", "normalized": "<TIMESTAMP> ...", "changed": [[78, 84]] }
         },
-        { "kind": "added", "left": null, "right": { "line": 8, "text": "..." } }
+        { "kind": "added", "left": null, "right": { "line": 8, "text": "..." } },
+        {
+          "kind": "modified", "left": { "line": 9, "text": "{\"level\":\"info\",\"user\":\"a\"}" }, "right": { "...": "..." },
+          "fieldChanges": [ { "field": "level", "left": "info", "right": "error" } ]
+        }
       ]
     }
   ]
@@ -149,6 +190,14 @@ Stable, versioned output for automation. Example (abridged):
 | `hunks[].rows[].kind` | `unchanged`, `modified`, `removed`, `added` |
 | `...changed` | `[start, end)` character ranges of word-level changes in `text` |
 | `...normalized` | present only when rules changed the line |
+| `left.firstLine` / `right.firstLine` | line number of the first line read; greater than 1 with `--since` |
+| `detected` | format (`plain`, `json`, `logfmt`) and preset (`null` for none) actually used, after auto-detection |
+| `insights.*Problems[].occurrences` | how many lines with the same message (numbers and ids masked) the item stands for |
+| `insights.templateShifts` | message templates (`<*>` marks a varying word) whose count changed; `variants` is the number of distinct messages it covers |
+| `insights.flakyLines` | lines that differ between good runs; `kind` is `values` (a part varies, `rules` mask it) or `presence` (the line comes and goes, `ignorePattern` hides it); `similarLines` more lines would be fixed by the same rules |
+| `problemTimeline` | warnings and errors in 60 equal bins of time (`byTime`, bin width `spanMillis / 60`) or, without timestamps, of line position |
+| `redactedSecrets` | number of secrets replaced by `[REDACTED]` in this report (0 with `--no-redact`) |
+| `hunks[].rows[].fieldChanges` | for JSON/logfmt lines: the fields whose value differs (`null` when the field is missing on that side) |
 | `movedFromOrToLine` | present on moved lines: the line number of the counterpart on the other side |
 
 `schemaVersion` increases only on incompatible changes. New fields may be added at any time.

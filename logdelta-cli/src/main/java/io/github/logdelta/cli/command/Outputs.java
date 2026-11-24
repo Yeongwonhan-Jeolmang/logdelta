@@ -14,12 +14,46 @@ import io.github.logdelta.core.report.Reports;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 
 /// Writing of report files named on the command line (`--report FILE`).
 final class Outputs {
 
     private Outputs() {
+    }
+
+    /// The result as it may leave the machine: secrets removed according to the options (see
+    /// `--no-redact` and `--redact`). Tells the user on standard error how many were removed.
+    static DiffResult exportable(DiffResult r, CliContext ctx, boolean quiet) {
+        DiffResult red = r.redacted(r.options().redactor());
+        if (red.redactedSecrets() > 0 && !quiet) {
+            ctx.err().println("logdelta: removed " + red.redactedSecrets()
+                    + " secret(s) from the report (use --no-redact to keep them)");
+        }
+        return red;
+    }
+
+    /// Warns when a time window left nothing of a log to compare: two empty logs are "identical",
+    /// which would otherwise let a mistyped `--since` pass a CI check silently.
+    static void warnAboutWindow(DiffResult r, CliContext ctx, boolean quiet) {
+        if (quiet) {
+            return;
+        }
+        for (var f : List.of(r.leftFile(), r.rightFile())) {
+            if (f.window() != null && f.lines().isEmpty()) {
+                ctx.err().println("logdelta: warning: no line of " + f.displayName() + " is inside the time window "
+                        + f.window().describe());
+            }
+        }
+    }
+
+    /// Creates the folder an output file goes into, like report files do.
+    static void createParent(Path file) throws IOException {
+        Path parent = file.toAbsolutePath().getParent();
+        if (parent != null) {
+            java.nio.file.Files.createDirectories(parent);
+        }
     }
 
     /// The report format implied by a file name, or `null` if the extension is unknown.

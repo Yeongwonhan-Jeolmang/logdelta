@@ -7,8 +7,10 @@ import io.github.logdelta.cli.args.ParsedArgs;
 import io.github.logdelta.cli.args.UsageException;
 import io.github.logdelta.cli.command.CheckCommand;
 import io.github.logdelta.cli.command.Command;
+import io.github.logdelta.cli.command.CompletionCommand;
 import io.github.logdelta.cli.command.DiffCommand;
 import io.github.logdelta.cli.command.ExplainCommand;
+import io.github.logdelta.cli.command.ManCommand;
 import io.github.logdelta.cli.command.NormalizeCommand;
 import io.github.logdelta.cli.command.RulesCommand;
 import io.github.logdelta.core.Version;
@@ -38,9 +40,13 @@ public final class LogDeltaCli {
     /// Creates the CLI with all built-in commands.
     public LogDeltaCli() {
         for (Command c : List.of(new DiffCommand(), new CheckCommand(), new NormalizeCommand(), new ExplainCommand(),
-                new RulesCommand())) {
+                new RulesCommand(), new CompletionCommand(this::commandList), new ManCommand(this::commandList))) {
             commands.put(c.name(), c);
         }
+    }
+
+    private List<Command> commandList() {
+        return List.copyOf(commands.values());
     }
 
     /// Runs the CLI and exits the JVM with the resulting status.
@@ -123,7 +129,7 @@ public final class LogDeltaCli {
     private static void printHelp(Command c, PrintStream out) {
         out.println("Usage: logdelta " + c.usage());
         out.println();
-        out.println(c.summary().substring(0, 1).toUpperCase() + c.summary().substring(1) + ".");
+        out.println(c.summary().substring(0, 1).toUpperCase(java.util.Locale.ROOT) + c.summary().substring(1) + ".");
         out.println();
         out.println("Options:");
         out.print(c.parser().optionsHelp());

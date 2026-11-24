@@ -4,10 +4,13 @@
 package io.github.logdelta.core.report;
 
 import io.github.logdelta.core.Version;
+import io.github.logdelta.core.analysis.FlakyLine;
 import io.github.logdelta.core.analysis.FrequencyShift;
 import io.github.logdelta.core.analysis.InsightItem;
 import io.github.logdelta.core.analysis.Insights;
+import io.github.logdelta.core.analysis.ProblemTimeline;
 import io.github.logdelta.core.analysis.Severity;
+import io.github.logdelta.core.analysis.TemplateShift;
 import io.github.logdelta.core.diff.Span;
 import io.github.logdelta.core.engine.DiffResult;
 import io.github.logdelta.core.io.LogFile;
@@ -55,10 +58,13 @@ public final class JsonReportWriter implements ReportWriter {
             }
             w.endArray();
             options(w, r);
+            detection(w, r);
             stats(w, r.stats(), r.elapsedMillis());
             insights(w, r);
             timing(w, r);
+            problemTimeline(w, r);
             suggestions(w, r);
+            w.name("redactedSecrets").value(r.redactedSecrets());
             hunks(w, r, options);
             w.endObject();
             w.finish();
@@ -75,6 +81,7 @@ public final class JsonReportWriter implements ReportWriter {
                 .name("bytes").value(f.sizeBytes())
                 .name("charset").value(f.charset().name())
                 .name("gzip").value(f.compressed())
+                .name("firstLine").value(f.firstLineNumber())
                 .endObject();
     }
 
@@ -86,7 +93,18 @@ public final class JsonReportWriter implements ReportWriter {
                 .name("ignoreCase").value(o.ignoreCase())
                 .name("ignoreWhitespace").value(o.ignoreWhitespace())
                 .name("detectMoves").value(o.detectMoves())
-                .name("multilineEntries").value(o.multilineEntries());
+                .name("multilineEntries").value(o.multilineEntries())
+                .name("logFormat").value(o.format().key())
+                .name("preset").value(o.preset());
+        w.name("ignoreFields").beginArray();
+        o.ignoreFields().forEach(w::value);
+        w.endArray();
+        if (o.timeWindow() != null) {
+            w.name("timeWindow").beginObject()
+                    .name("since").value(o.timeWindow().since() == null ? null : o.timeWindow().since().text())
+                    .name("until").value(o.timeWindow().until() == null ? null : o.timeWindow().until().text())
+                    .endObject();
+        }
         w.name("ignorePatterns").beginArray();
         o.ignorePatterns().forEach(w::value);
         w.endArray();
@@ -96,6 +114,39 @@ public final class JsonReportWriter implements ReportWriter {
         }
         w.endArray();
         w.endObject();
+    }
+
+    private static void detection(JsonWriter w, DiffResult r) {
+        var d = r.detection();
+        w.name("detected").beginObject()
+                .name("format").value(d.format().key())
+                .name("preset").value(d.preset() == null ? null : d.preset().id())
+                .endObject();
+    }
+
+    private static void problemTimeline(JsonWriter w, DiffResult r) {
+        ProblemTimeline t = r.problemTimeline();
+        if (t == null) {
+            return;
+        }
+        w.name("problemTimeline").beginObject()
+                .name("byTime").value(t.byTime())
+                .name("spanMillis").value(t.spanMillis());
+        timelineSide(w, "left", t.left());
+        timelineSide(w, "right", t.right());
+        w.endObject();
+    }
+
+    private static void timelineSide(JsonWriter w, String name, ProblemTimeline.Side s) {
+        w.name(name).beginObject().name("warnings").beginArray();
+        for (int v : s.warnings()) {
+            w.value(v);
+        }
+        w.endArray().name("errors").beginArray();
+        for (int v : s.errors()) {
+            w.value(v);
+        }
+        w.endArray().endObject();
     }
 
     private static void stats(JsonWriter w, DiffStats s, long elapsed) {
@@ -146,6 +197,31 @@ public final class JsonReportWriter implements ReportWriter {
                     .name("right").value(f.rightCount()).name("delta").value(f.delta()).endObject();
         }
         w.endArray();
+        w.name("templateShifts").beginArray();
+        for (TemplateShift t : in.templateShifts()) {
+            w.beginObject().name("template").value(t.template()).name("severity").value(t.severity().name())
+                    .name("left").value(t.leftCount()).name("right").value(t.rightCount())
+                    .name("delta").value(t.delta()).name("variants").value(t.variants()).endObject();
+        }
+        w.endArray();
+        w.name("flakyLines").beginArray();
+        for (FlakyLine f : in.flakyLines()) {
+            w.beginObject().name("kind").value(f.kind().name().toLowerCase(Locale.ROOT))
+                    .name("line").value(f.lineNumber()).name("text").value(f.text())
+                    .name("varyingRuns").value(f.varyingRuns()).name("totalRuns").value(f.totalRuns())
+                    .name("similarLines").value(f.similarLines());
+            w.name("rules").beginArray();
+            for (Rule rule : f.rules()) {
+                w.beginObject().name("id").value(rule.id()).name("pattern").value(rule.regex())
+                        .name("replacement").value(rule.replacement()).endObject();
+            }
+            w.endArray();
+            if (f.ignorePattern() != null) {
+                w.name("ignorePattern").value(f.ignorePattern());
+            }
+            w.endObject();
+        }
+        w.endArray();
         w.endObject();
     }
 
@@ -192,7 +268,12 @@ public final class JsonReportWriter implements ReportWriter {
         w.name(name).beginArray();
         for (InsightItem i : items) {
             w.beginObject().name("line").value(i.lineNumber()).name("severity").value(i.severity().name())
-                    .name("text").value(i.text()).name("groupedLines").value(i.lines()).endObject();
+                    .name("text").value(i.text()).name("groupedLines").value(i.lines())
+                    .name("occurrences").value(i.occurrences());
+            if (i.template() != null) {
+                w.name("template").value(i.template());
+            }
+            w.endObject();
         }
         w.endArray();
     }
@@ -213,6 +294,18 @@ public final class JsonReportWriter implements ReportWriter {
                 }
                 side(w, "left", r.left(row), row.inline().left());
                 side(w, "right", r.right(row), row.inline().right());
+                if (row.kind() == io.github.logdelta.core.model.RowKind.MODIFIED) {
+                    var changes = r.fieldChanges(row);
+                    if (!changes.isEmpty()) {
+                        w.name("fieldChanges").beginArray();
+                        for (var c : changes) {
+                            w.beginObject().name("field").value(c.name())
+                                    .name("left").value(c.left() == null ? null : c.left().value())
+                                    .name("right").value(c.right() == null ? null : c.right().value()).endObject();
+                        }
+                        w.endArray();
+                    }
+                }
                 if (row.isMoved()) {
                     DiffRow peer = r.rows().get(row.movedPeer());
                     ProcessedLine pl = peer.hasLeft() ? r.left(peer) : r.right(peer);

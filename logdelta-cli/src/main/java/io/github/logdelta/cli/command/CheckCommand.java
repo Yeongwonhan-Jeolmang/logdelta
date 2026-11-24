@@ -261,8 +261,10 @@ public final class CheckCommand implements Command {
         DiffResult result = new LogDeltaEngine().compare(logs.getFirst(), logs.subList(1, logs.size()), cand,
                 s.options(), s.progress(), CancellationToken.NEVER);
         StderrProgress.clear(s.progress());
+        Outputs.warnAboutWindow(result, ctx, args.has("quiet"));
 
-        List<InsightItem> failing = failing(result.insights().newProblems(), s.failOn());
+        DiffResult exported = Outputs.exportable(result, ctx, args.has("quiet"));
+        List<InsightItem> failing = failing(exported.insights().newProblems(), s.failOn());
         boolean pass = s.failOn().equals("changes") ? result.isIdentical() : failing.isEmpty();
 
         if (!args.has("quiet")) {
@@ -270,19 +272,20 @@ public final class CheckCommand implements Command {
             if (s.format().equals(SUMMARY)) {
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                 PrintStream ps = new PrintStream(buffer, true, StandardCharsets.UTF_8);
-                new SummaryRenderer(s.ansi(), s.glyphs(), s.width()).render(result, ps);
+                // CI logs are often public, so `check` shows the redacted result everywhere.
+                new SummaryRenderer(s.ansi(), s.glyphs(), s.width()).render(exported, ps);
                 text = buffer.toString(StandardCharsets.UTF_8);
             } else {
-                text = Reports.writer(ReportFormat.parse(s.format())).render(result, ReportOptions.DEFAULT);
+                text = Reports.writer(ReportFormat.parse(s.format())).render(exported, ReportOptions.DEFAULT);
             }
             write(ctx, s.outFile(), text);
         }
         for (Outputs.Target t : s.reports()) {
-            t.write(result, ReportOptions.DEFAULT, ctx);
+            t.write(exported, ReportOptions.DEFAULT, ctx);
         }
         if (args.has("github")) {
             github(ctx, result.rightFile().displayName(), failing,
-                    Reports.writer(ReportFormat.MARKDOWN).render(result, ReportOptions.DEFAULT.withMaxHunks(5)));
+                    Reports.writer(ReportFormat.MARKDOWN).render(exported, ReportOptions.DEFAULT.withMaxHunks(5)));
         }
 
         String reason = pass ? passReason(s.failOn())
@@ -388,9 +391,10 @@ public final class CheckCommand implements Command {
             return ExitCode.OK;
         }
 
-        FolderComparison c = new FolderComparer().compare(baseDir, extraDirs, candDir, s.options(),
+        FolderComparison raw = new FolderComparer().compare(baseDir, extraDirs, candDir, s.options(),
                 Inputs.folderOptions(args), s.progress(), CancellationToken.NEVER);
         StderrProgress.clear(s.progress());
+        FolderComparison c = raw.redacted(s.options().redactor());
 
         List<InsightItem> failing = new ArrayList<>();
         for (FolderEntry e : c.entries()) {
@@ -419,7 +423,7 @@ public final class CheckCommand implements Command {
             for (FolderEntry e : c.entries()) {
                 for (InsightItem i : failing(e.newProblems(), s.failOn())) {
                     annotate.add(new InsightItem(i.row(), i.lineNumber(), i.severity(), e.name() + ": " + i.text(),
-                            i.lines()));
+                            i.lines(), i.occurrences(), i.template()));
                 }
             }
             github(ctx, candDir.getFileName() == null ? candidate : candDir.getFileName().toString(), annotate,
@@ -505,6 +509,7 @@ public final class CheckCommand implements Command {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
+            Outputs.createParent(outFile);
             Files.writeString(outFile, text, StandardCharsets.UTF_8);
             ctx.err().println("Wrote " + outFile);
         } else {
@@ -523,7 +528,9 @@ public final class CheckCommand implements Command {
             }
             String level = i.severity().compareTo(Severity.ERROR) >= 0 ? "error" : "warning";
             String title = "New " + i.severity().label() + " in " + candidate;
-            String message = "line " + i.lineNumber() + ": " + Text.truncate(LogText.message(i.text()).strip(), 300);
+            String repeated = i.repeated() ? " (\u00d7" + i.occurrences() + ": " + i.template() + ")" : "";
+            String message = "line " + i.lineNumber() + ": " + Text.truncate(LogText.message(i.text()).strip(), 300)
+                    + repeated;
             ctx.out().println("::" + level + " title=" + escapeProperty(title) + "::" + escapeData(message));
         }
         String summaryFile = ctx.env().get("GITHUB_STEP_SUMMARY");

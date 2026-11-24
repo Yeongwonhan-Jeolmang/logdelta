@@ -11,6 +11,9 @@ import io.github.logdelta.core.normalize.InvalidRuleException;
 import io.github.logdelta.core.normalize.Rule;
 import io.github.logdelta.core.normalize.RuleCategory;
 import io.github.logdelta.core.normalize.RuleSet;
+import io.github.logdelta.core.preset.Presets;
+import io.github.logdelta.core.structured.LogFormat;
+import io.github.logdelta.core.timing.TimeWindow;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -48,10 +51,25 @@ import java.util.Map;
 /// builtins = on
 /// # optional evaluation order; rules not listed keep their position after these
 /// order = order-id, uuid
+/// # auto | plain | json | logfmt
+/// log-format = auto
+/// # structured logs: fields left out of the comparison (replaces the default list)
+/// ignore-fields = ts, traceId, spanId
+/// # auto | none | spring-boot | access-log | kubernetes | journald | logcat | python
+/// preset = auto
+/// # compare only part of each run: +5m (into the run), 08:49:03, 2026-11-12T08:49
+/// since = +1m
+/// until = +5m
+/// # remove secrets and e-mail addresses from exported reports
+/// redact = true
 ///
 /// [ignore]
 /// # repeatable; lines matching any pattern are left out
 /// pattern = ^DEBUG\b
+///
+/// [redact]
+/// # repeatable; matches are removed from exported reports
+/// pattern = customer-\d+
 ///
 /// # Built-in rule: only 'enabled' is needed.
 /// [rule iso-timestamp]
@@ -104,6 +122,9 @@ public final class ProfileIO {
         Map<String, Integer> patternLines = new LinkedHashMap<>();
         boolean builtins = true;
         List<String> order = List.of();
+        List<String> redact = new ArrayList<>();
+        String since = null;
+        String until = null;
 
         BufferedReader in = new BufferedReader(reader);
         String section = null;
@@ -123,7 +144,8 @@ public final class ProfileIO {
                 }
                 String header = line.substring(1, line.length() - 1).strip();
                 currentRule = null;
-                if (header.equalsIgnoreCase("options") || header.equalsIgnoreCase("ignore")) {
+                if (header.equalsIgnoreCase("options") || header.equalsIgnoreCase("ignore")
+                        || header.equalsIgnoreCase("redact")) {
                     section = header.toLowerCase(Locale.ROOT);
                 } else if (header.toLowerCase(Locale.ROOT).startsWith("rule ")) {
                     String id = header.substring(5).strip();
@@ -162,6 +184,18 @@ public final class ProfileIO {
                             case "multiline-entries" -> options.multilineEntries(bool(value, lineNo));
                             case "builtins" -> builtins = bool(value, lineNo);
                             case "order" -> order = splitList(value);
+                            case "log-format", "format" -> options.format(LogFormat.parse(value));
+                            case "ignore-fields" -> options.ignoreFields(splitList(value));
+                            case "preset" -> options.preset(Presets.parseOption(value));
+                            case "since" -> {
+                                TimeWindow.parseBound(value);
+                                since = value;
+                            }
+                            case "until" -> {
+                                TimeWindow.parseBound(value);
+                                until = value;
+                            }
+                            case "redact" -> options.redactSecrets(bool(value, lineNo));
                             default -> throw new ProfileParseException(lineNo, "Unknown option '" + key + "'", null);
                         }
                     }
@@ -170,6 +204,12 @@ public final class ProfileIO {
                             throw new ProfileParseException(lineNo, "Expected 'pattern = ...' in [ignore]", null);
                         }
                         ignore.add(value);
+                    }
+                    case "redact" -> {
+                        if (!key.equals("pattern")) {
+                            throw new ProfileParseException(lineNo, "Expected 'pattern = ...' in [redact]", null);
+                        }
+                        redact.add(value);
                     }
                     case "rule" -> {
                         currentRule.put(key, value);
@@ -186,8 +226,13 @@ public final class ProfileIO {
 
         RuleSet rules = buildRules(ruleSections, ruleLines, patternLines, builtins, order);
         try {
-            return options.rules(rules).ignorePatterns(ignore).build();
+            if (since != null || until != null) {
+                options.timeWindow(TimeWindow.parse(since, until));
+            }
+            return options.rules(rules).ignorePatterns(ignore).redactPatterns(redact).build();
         } catch (InvalidRuleException e) {
+            throw new ProfileParseException(0, e.getMessage(), e);
+        } catch (IllegalArgumentException e) {
             throw new ProfileParseException(0, e.getMessage(), e);
         }
     }
@@ -202,7 +247,19 @@ public final class ProfileIO {
             Map<String, String> kv = e.getValue();
             int line = lines.get(id);
             Rule builtin = BuiltinRules.find(id);
+            Rule presetRule = builtin == null ? Presets.findRule(id) : null;
             try {
+                if (presetRule != null && !kv.containsKey("pattern")) {
+                    for (String k : kv.keySet()) {
+                        if (!k.equals("enabled")) {
+                            throw new ProfileParseException(line, "Preset rule '" + id
+                                    + "' only accepts 'enabled' unless it redefines 'pattern'", null);
+                        }
+                    }
+                    boolean enabled = !kv.containsKey("enabled") || bool(kv.get("enabled"), line);
+                    custom.add(presetRule.withEnabled(enabled));
+                    continue;
+                }
                 if (builtin != null && !kv.containsKey("pattern")) {
                     for (String k : kv.keySet()) {
                         if (!k.equals("enabled")) {
@@ -282,8 +339,26 @@ public final class ProfileIO {
         sb.append("inline-diff = ").append(o.inlineDiff()).append('\n');
         sb.append("minimal = ").append(o.minimal()).append('\n');
         sb.append("multiline-entries = ").append(o.multilineEntries()).append('\n');
+        sb.append("log-format = ").append(o.format().key()).append('\n');
+        if (!o.ignoreFields().equals(DiffOptions.DEFAULT_IGNORED_FIELDS)) {
+            sb.append("ignore-fields = ").append(String.join(", ", o.ignoreFields())).append('\n');
+        }
+        sb.append("preset = ").append(o.preset()).append('\n');
+        if (o.timeWindow() != null) {
+            if (o.timeWindow().since() != null) {
+                sb.append("since = ").append(o.timeWindow().since().text()).append('\n');
+            }
+            if (o.timeWindow().until() != null) {
+                sb.append("until = ").append(o.timeWindow().until().text()).append('\n');
+            }
+        }
+        sb.append("redact = ").append(o.redactSecrets()).append('\n');
 
-        List<Rule> rules = o.rules().rules();
+        // Enabled, unchanged preset rules are not saved: the preset adds them again.
+        List<Rule> rules = o.rules().rules().stream().filter(r -> {
+            Rule preset = Presets.findRule(r.id());
+            return preset == null || !r.enabled() || !preset.equals(r);
+        }).toList();
         List<String> canonical = canonicalOrder(rules);
         List<String> actual = rules.stream().map(Rule::id).toList();
         if (!canonical.equals(actual)) {
@@ -297,7 +372,22 @@ public final class ProfileIO {
             }
         }
 
+        if (!o.redactPatterns().isEmpty()) {
+            sb.append("\n[redact]\n");
+            for (String p : o.redactPatterns()) {
+                sb.append("pattern = ").append(quote(p)).append('\n');
+            }
+        }
+
         for (Rule r : rules) {
+            Rule preset = Presets.findRule(r.id());
+            if (preset != null && preset.withEnabled(r.enabled()).equals(r)) {
+                // Preset rules come back with the preset; only a disabled one needs saving.
+                if (!r.enabled()) {
+                    sb.append("\n[rule ").append(r.id()).append("]\nenabled = false\n");
+                }
+                continue;
+            }
             Rule builtin = r.builtin() ? BuiltinRules.find(r.id()) : null;
             if (builtin != null && builtin.withEnabled(r.enabled()).equals(r)) {
                 if (r.enabled() != builtin.enabled()) {

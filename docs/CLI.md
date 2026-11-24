@@ -8,6 +8,8 @@ logdelta check [options] (--baseline FILE... | --baseline-dir DIR) CANDIDATE
 logdelta normalize [options] FILE
 logdelta explain [options] [LINE...]
 logdelta rules [options]
+logdelta completion bash|zsh|fish|powershell
+logdelta manpage [--date YYYY-MM-DD]
 logdelta gui [BASELINE... CANDIDATE | BASELINE_DIR CANDIDATE_DIR | SESSION]
 logdelta cli [ARGS...]
 logdelta help [COMMAND]
@@ -34,6 +36,32 @@ is sometimes there, a value that varies between good runs) is marked as *normal 
 stays visible (faded, marked `≈`) but no longer counts as a change or a new problem.
 `--baseline FILE` adds a good run without changing the positional order.
 
+**Structured logs.** JSON lines and logfmt (`level=info msg="..." user=42`) are detected
+automatically when at least 60 % of the sampled lines parse. They are compared field by field:
+key order does not matter, fields are matched by name, and the output lists which fields
+changed. Timestamps and trace/span ids (`@timestamp`, `timestamp`, `time`, `ts`, `traceId`,
+`spanId`, ...) are ignored by default; `--compare-field ts` brings one back and
+`--ignore-field requestId` (globs allowed: `*.id`, `*_ms`) leaves more out. Lines that are not
+structured in a structured log are compared as text.
+
+**Presets.** Logs from Spring Boot, nginx/Apache (access logs), Kubernetes/containerd,
+journald/syslog, Android logcat and Python `logging` are recognised and their run-specific parts
+(PIDs, pod hashes, client addresses, `tid`s...) masked. `--preset none` turns that off,
+`--preset logcat` forces one; `logdelta rules --presets` lists them with their rules.
+
+**Time windows.** `--since` and `--until` compare only part of each run. They accept a date and
+time (`2026-11-12T08:49`, `2026-11-12 08:49:03`), a time of day (`08:49`) or an offset from the
+first timestamped line of each log (`+5m`, `+90s`, `+1h30m`), so two runs started at different
+times can be compared over the same phase. Lines without a timestamp belong to the line before.
+Reading stops at the end of the window, which makes slicing a huge log fast. A time-of-day
+window may cross midnight (`--since 23:50 --until 00:10`). A bound on the command line replaces
+only the same bound of a profile. If no line of a log falls inside the window, a warning says
+so (two empty logs would otherwise count as identical).
+
+**Large files.** Files of 32 MB and more are memory-mapped and read in chunks; lines are kept in
+compact form. Two 300 MB logs need about 4 GB of heap (`java -Xmx4g -jar ...`); with a time
+window much less. The installed `logdelta-cli` launcher already uses up to 75 % of the memory.
+
 **Folders.** Two folders are compared file by file, matched by relative path. Files whose names
 differ only in digits (dates, counters: `app-2026-11-02.log` and `app-2026-11-03.log`) are
 paired too, when the match is unambiguous. The table lists every file with its similarity and
@@ -51,9 +79,18 @@ errors. Hidden files are skipped, and so are binary files.
 | `-I, --ignore REGEX` | Leave out lines matching `REGEX` (searched anywhere in the line). Repeatable. |
 | `-i, --ignore-case` | Compare case-insensitively. |
 | `-w, --ignore-whitespace` | Treat whitespace runs as one space; ignore leading/trailing whitespace. |
+| `--log-format FMT` | `auto` (default), `plain`, `json` or `logfmt`. |
+| `--ignore-field NAME` | Structured logs: leave a field out of the comparison (glob, case-insensitive). Repeatable. |
+| `--compare-field NAME` | Structured logs: compare a field that is ignored by default (e.g. `ts`). Repeatable. |
+| `--preset ID` | `auto` (default), `none` or a preset id. |
+| `--since TIME` / `--until TIME` | Compare only part of each log (see *Time windows*). |
+| `--no-profile` | Do not pick up a `.logdelta` profile automatically. |
 | `-M, --multiline` | Treat a line and its continuation lines (stack traces, wrapped messages) as one entry when diffing (`diff` and `check`). |
 
 Precedence, lowest to highest: built-in defaults, then the profile, then command-line options.
+
+Without `-p`, a `.logdelta` file in the working folder or a parent (up to the repository root)
+is loaded as the profile; see [Profiles](PROFILES.md#automatic-profiles).
 
 ## `diff`
 
@@ -81,6 +118,14 @@ Precedence, lowest to highest: built-in defaults, then the profile, then command
 | `--exit-code MODE` | `any` (default), `problems` or `never`. See below. |
 | `-q, --quiet` | Print nothing; only set the exit status. |
 | `--progress` | Show progress on standard error (useful for very large files). |
+| `--no-redact` | Keep secrets in report files (see below). |
+| `--redact REGEX` | Also remove matches of `REGEX` from reports. Repeatable. |
+
+**Secrets.** Reports (`html`, `json`, `markdown`, `junit`, `unified`, and `--report` files) have
+passwords, tokens, API keys, private keys, credentials in URLs and e-mail addresses replaced by
+`[REDACTED]`; the number removed is printed on standard error. The side-by-side and
+summary views on a terminal are not changed, unless they are written to a file with `-o`;
+`check` always shows the redacted result, because CI logs are often public. See [Reports](REPORTS.md#secrets-in-reports).
 
 Default format: `side-by-side` when standard output is a terminal, `unified` otherwise.
 
@@ -116,6 +161,16 @@ dimmed.
   factor of 1.5.
 - **Suggested rules**: when many modified lines differ only in the value of one key (such as
   `session=…`), the `--mask` that would hide that noise.
+- **Format**: the detected log format and preset.
+- **Problems over time**: a sparkline of warnings and errors per side, e.g. `▁▁▂▇█▃▁`.
+- **Message templates**: kinds of messages whose count changed, with `<*>` for the varying
+  parts (`Payment gateway call failed (attempt <*> ...): 0 → 15`), so one change is not listed
+  once per order number.
+- **Flaky lines**: with several baselines, lines that already vary between good runs, and the
+  `--mask` or `--ignore` that hides them.
+
+For JSON and logfmt lines, the unified and Markdown output add an `@@ field changes @@` block
+under each modified line listing `field: old → new`.
 
 ## `check`
 
@@ -171,7 +226,8 @@ pull-request comment.
 
 ## `normalize`
 
-Prints a file the way LogDelta sees it.
+Prints a file the way LogDelta sees it: with the same time window, detected format and preset,
+ignored fields and rules as a comparison. The detected format is printed on standard error.
 
 | Option | Description |
 |---|---|
@@ -187,6 +243,8 @@ logdelta normalize app.log | sort | uniq -c | sort -rn | head
 ## `explain`
 
 Shows which rule masked which characters. Reads lines from standard input if none are given.
+The format and preset are detected from the lines given, as in a comparison, so JSON lines show
+their ignored fields too.
 
 ```text
 $ logdelta explain "2026-11-12 08:49:03 INFO pid=42 took 3ms"
@@ -206,10 +264,30 @@ Lists the effective rules in evaluation order.
 |---|---|
 | `-v, --verbose` | Also show patterns and descriptions. |
 | `--export FILE` | Write the effective options as a profile instead of listing. |
+| `--presets` | List the built-in presets and their rules. |
+| `--preset ID` | Include a preset's rules in the list (and in `--export`). |
+| `--redaction` | List the secret detectors used for reports. |
 
 ```sh
 logdelta rules --mask 'ORD-\d+=>ORD-<ID>' --disable epoch --export team.ldprofile
 ```
+
+## `completion`
+
+Prints a completion script for `bash`, `zsh`, `fish` or `powershell`, covering both
+`logdelta` and `logdelta-cli`. The .deb installs them for bash, zsh and fish; otherwise:
+
+```sh
+logdelta completion bash > ~/.local/share/bash-completion/completions/logdelta
+logdelta completion zsh  > "${fpath[1]}/_logdelta"
+logdelta completion fish > ~/.config/fish/completions/logdelta.fish
+logdelta completion powershell | Out-String | Invoke-Expression   # add to $PROFILE
+```
+
+## `manpage`
+
+Prints the manual page in roff (`logdelta manpage > logdelta.1; man ./logdelta.1`). The .deb
+installs it, so `man logdelta` works. `--date` fixes the footer date for reproducible builds.
 
 ## Environment
 
@@ -217,4 +295,5 @@ logdelta rules --mask 'ORD-\d+=>ORD-<ID>' --disable epoch --export team.ldprofil
 |---|---|
 | `COLUMNS` | Terminal width for side-by-side and summary output. |
 | `NO_COLOR` | Disables colour when `--color auto`. |
+| `LOGDELTA_AUTO_PROFILE` | `0` stops the search for a `.logdelta` profile. |
 | `JAVA_OPTS` / `-Xmx` | For very large logs, give the JVM more memory: `java -Xmx4g -jar logdelta.jar ...`. |

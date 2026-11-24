@@ -70,6 +70,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// One comparison: its sources and options, the diff view, the sidebar, bookmarks and notes, and
 /// live-tail state.
 public final class ComparisonTab extends JPanel implements AppTab, ComparisonController.Listener {
@@ -109,7 +111,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     private Path sessionFile;
     private boolean dirty;
 
-    private String statusMessage = "Ready";
+    private String statusMessage = tr("Ready");
     private String statusDetails = "";
     private boolean busy;
     private String busyStage = "";
@@ -161,11 +163,12 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         welcome = new WelcomePanel(this::openBoth, this::openExample,
                 p -> controller.open(p.leftSource(), p.rightSource()), welcomeLinks);
 
-        sidebar.addTab("Summary", summary);
-        sidebar.addTab("Insights", insights);
-        sidebar.addTab("Timing", timing);
-        sidebar.addTab("Rules", rulesPanel);
-        sidebar.addTab("Notes", notesPanel);
+        sidebar.addTab(tr("Summary"), summary);
+        sidebar.addTab(tr("Insights"), insights);
+        sidebar.addTab(tr("Timing"), timing);
+        sidebar.addTab(tr("Rules"), rulesPanel);
+        sidebar.addTab(tr("Notes"), notesPanel);
+        sidebar.getAccessibleContext().setAccessibleName(tr("Sidebar"));
         sidebar.setMinimumSize(new Dimension(240, 100));
         sidebar.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         sidebar.setName("tour.sidebar");
@@ -195,6 +198,11 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             public void bookmarkToggleRequested(int viewIndex, boolean leftSide) {
                 toggleBookmark(leftSide);
             }
+
+            @Override
+            public void selectionChanged(int viewIndex) {
+                ComparisonTab.this.selectionChanged();
+            }
         });
         diffView.canvas().setSplit(host.settings().paneSplit());
         diffView.canvas().setBookmarks(DiffCanvas.lookup(bookmarkNotes));
@@ -214,7 +222,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     @Override
     public String title() {
         if (controller.left() == null && controller.right() == null) {
-            return "New comparison";
+            return tr("New comparison");
         }
         String l = controller.left() == null ? "?" : controller.left().displayName();
         String r = controller.right() == null ? "?" : controller.right().displayName();
@@ -225,19 +233,19 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     public String tooltip() {
         StringBuilder sb = new StringBuilder("<html>");
         if (controller.left() != null) {
-            sb.append("Baseline: ").append(esc(controller.left().description())).append("<br>");
+            sb.append(tr("Baseline:")).append(" ").append(esc(controller.left().description())).append("<br>");
         }
         for (Source s : controller.extraBaselines()) {
-            sb.append("Also: ").append(esc(s.description())).append("<br>");
+            sb.append(tr("Also:")).append(" ").append(esc(s.description())).append("<br>");
         }
         if (controller.right() != null) {
-            sb.append("Candidate: ").append(esc(controller.right().description())).append("<br>");
+            sb.append(tr("Candidate:")).append(" ").append(esc(controller.right().description())).append("<br>");
         }
         if (sessionFile != null) {
-            sb.append("Session: ").append(esc(sessionFile.toString())).append("<br>");
+            sb.append(tr("Session:")).append(" ").append(esc(sessionFile.toString())).append("<br>");
         }
         if (liveTail) {
-            sb.append("<i>Live tail: following changes</i>");
+            sb.append("<i>").append(tr("Live tail: following changes")).append("</i>");
         }
         return sb.append("</html>").toString();
     }
@@ -278,8 +286,8 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             return true;
         }
         int answer = JOptionPane.showConfirmDialog(this,
-                "This comparison has bookmarks or notes that are not saved.\nSave them as a session first?",
-                "Close comparison", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+                tr("This comparison has bookmarks or notes that are not saved.\nSave them as a session first?"),
+                tr("Close comparison"), JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
         if (answer == JOptionPane.CANCEL_OPTION || answer == JOptionPane.CLOSED_OPTION) {
             return false;
         }
@@ -348,7 +356,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     @Override
     public void comparisonStarted() {
         busy = true;
-        busyStage = "Comparing";
+        busyStage = tr("Comparing");
         busyFraction = -1;
         // Follow the end if live tail was just switched on, or the user is already at the end.
         followAfterReload = liveTail && (followAfterReload || controller.result() == null || diffView.isAtEnd());
@@ -371,19 +379,22 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         summary.show(result);
         insights.show(result);
         timing.show(result);
-        rulesPanel.setSuggestions(result.suggestions());
+        rulesPanel.setSuggestions(result.suggestions(), result.insights().flakyLines());
+        rulesPanel.setDetection(result.detection());
         int problems = result.insights().newProblems().size();
-        sidebar.setTitleAt(1, problems == 0 ? "Insights" : "Insights (" + problems + ")");
+        sidebar.setTitleAt(1, problems == 0 ? tr("Insights") : tr("Insights") + " (" + problems + ")");
         int slower = timing.slowerCount();
-        sidebar.setTitleAt(2, slower == 0 ? "Timing" : "Timing (" + slower + ")");
-        sidebar.setTitleAt(3, result.suggestions().isEmpty() ? "Rules" : "Rules •");
+        sidebar.setTitleAt(2, slower == 0 ? tr("Timing") : tr("Timing") + " (" + slower + ")");
+        boolean hints = !result.suggestions().isEmpty() || !result.insights().flakyLines().isEmpty();
+        sidebar.setTitleAt(3, hints ? tr("Rules") + " \u2022" : tr("Rules"));
         var s = result.stats();
-        statusMessage = s.identical() ? (s.expected() > 0 ? "Only normal variation ("
-                + s.expected() + " differences other baselines share)" : "No differences after normalization")
-                : String.format(Locale.ROOT, "%,d modified · %,d removed · %,d added · %,d moved%s",
-                s.modified(), s.removed() - s.moved(), s.added() - s.moved(), s.moved(),
-                s.expected() > 0 ? " · " + s.expected() + " normal variation" : "");
-        statusDetails = String.format(Locale.ROOT, "%s · %d ms · %s / %s",
+        statusMessage = s.identical() ? (s.expected() > 0 ? tr("Only normal variation ({0} differences other "
+                + "baselines share)", s.expected()) : tr("No differences after normalization"))
+                : tr("{0} modified · {1} removed · {2} added · {3} moved", fmt(s.modified()),
+                fmt(s.removed() - s.moved()), fmt(s.added() - s.moved()), fmt(s.moved()))
+                + (s.expected() > 0 ? " · " + tr("{0} normal variation", s.expected()) : "");
+        String detected = io.github.logdelta.gui.sidebar.RulesPanel.describe(result.detection());
+        statusDetails = (detected.isEmpty() ? "" : detected + " · ") + String.format(Locale.ROOT, "%s · %d ms · %s / %s",
                 result.options().algorithm().displayName(), result.elapsedMillis(),
                 result.leftFile().charset().name(), result.rightFile().charset().name());
         if (!remembered && !refresh) {
@@ -407,10 +418,10 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     @Override
     public void comparisonFailed(String message) {
         busy = false;
-        statusMessage = message == null ? "Comparison cancelled" : message;
+        statusMessage = message == null ? tr("Comparison cancelled") : message;
         host.tabChanged(this);
         if (message != null && !liveTail) {
-            JOptionPane.showMessageDialog(this, message, "Cannot compare", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, message, tr("Cannot compare"), JOptionPane.ERROR_MESSAGE);
         }
         runPendingReload();
     }
@@ -425,7 +436,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     /// Asks for one or two files.
     public void openBoth() {
-        JFileChooser chooser = host.chooser("Choose the baseline and candidate logs (select two files)");
+        JFileChooser chooser = host.chooser(tr("Choose the baseline and candidate logs (select two files)"));
         chooser.setMultiSelectionEnabled(true);
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
@@ -446,7 +457,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     /// Asks for the baseline (`left`) or the candidate file.
     public void browse(boolean left) {
-        JFileChooser chooser = host.chooser(left ? "Choose the baseline log" : "Choose the candidate log");
+        JFileChooser chooser = host.chooser(left ? tr("Choose the baseline log") : tr("Choose the candidate log"));
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             host.settings().setLastDirectory(chooser.getCurrentDirectory().toPath());
             Source s = Source.of(chooser.getSelectedFile().toPath());
@@ -487,11 +498,11 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             text = "";
         }
         if (text.isBlank()) {
-            JOptionPane.showMessageDialog(this, "The clipboard does not contain text.", "Paste log",
+            JOptionPane.showMessageDialog(this, tr("The clipboard does not contain text."), tr("Paste log"),
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        String name = "Pasted " + (left ? "baseline" : "candidate") + " "
+        String name = (left ? tr("Pasted baseline") : tr("Pasted candidate")) + " "
                 + java.time.LocalTime.now().withNano(0);
         Source s = new Source.Text(LogFile.ofText(name, text));
         if (left) {
@@ -499,7 +510,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         } else {
             controller.setRight(s);
         }
-        statusMessage = "Pasted " + s.description() + " as the " + (left ? "baseline" : "candidate");
+        statusMessage = left ? tr("Pasted {0} as the baseline", s.description()) : tr("Pasted {0} as the candidate", s.description());
         host.tabChanged(this);
     }
 
@@ -515,10 +526,10 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             controller.setOptions(ProfileIO.read(profile));
             controller.setExtraBaselines(List.of(Source.of(extra)));
             open(Source.of(left), Source.of(right));
-            statusMessage = "Loaded the example with its profile and a second known-good run";
+            statusMessage = tr("Loaded the example with its profile and a second known-good run");
             host.tabChanged(this);
         } catch (IOException | ProfileParseException e) {
-            JOptionPane.showMessageDialog(this, "Cannot load the example: " + e.getMessage(), "Example",
+            JOptionPane.showMessageDialog(this, "Cannot load the example: " + e.getMessage(), tr("Example"),
                     JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -539,12 +550,12 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     private void showBaselinesMenu(JButton anchor) {
         JPopupMenu menu = new JPopupMenu();
-        JMenuItem addFile = new JMenuItem("Add Baseline Run…");
+        JMenuItem addFile = new JMenuItem(tr("Add Baseline Run…"));
         addFile.addActionListener(_ -> addBaseline());
         menu.add(addFile);
-        JMenuItem addUrl = new JMenuItem("Add Baseline from URL…");
+        JMenuItem addUrl = new JMenuItem(tr("Add Baseline from URL…"));
         addUrl.addActionListener(_ -> {
-            String url = JOptionPane.showInputDialog(this, "URL of another known-good run:", "Add baseline",
+            String url = JOptionPane.showInputDialog(this, tr("URL of another known-good run:"), tr("Add baseline"),
                     JOptionPane.PLAIN_MESSAGE);
             if (url != null && !url.isBlank()) {
                 try {
@@ -552,7 +563,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
                     next.add(Source.parse(url));
                     controller.setExtraBaselines(next);
                 } catch (IllegalArgumentException e) {
-                    JOptionPane.showMessageDialog(this, e.getMessage(), "Add baseline", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(this, e.getMessage(), tr("Add baseline"), JOptionPane.ERROR_MESSAGE);
                 }
             }
         });
@@ -560,7 +571,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         if (!controller.extraBaselines().isEmpty()) {
             menu.addSeparator();
             for (Source s : controller.extraBaselines()) {
-                JMenuItem remove = new JMenuItem("Remove " + s.displayName());
+                JMenuItem remove = new JMenuItem(tr("Remove {0}", s.displayName()));
                 remove.setToolTipText(s.description());
                 remove.addActionListener(_ -> {
                     List<Source> next = new ArrayList<>(controller.extraBaselines());
@@ -570,7 +581,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
                 menu.add(remove);
             }
             menu.addSeparator();
-            JMenuItem clear = new JMenuItem("Remove All Extra Baselines");
+            JMenuItem clear = new JMenuItem(tr("Remove All Extra Baselines"));
             clear.addActionListener(_ -> controller.setExtraBaselines(List.of()));
             menu.add(clear);
         }
@@ -579,7 +590,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     /// Asks for one or more further known-good runs.
     public void addBaseline() {
-        JFileChooser chooser = host.chooser("Choose other known-good runs");
+        JFileChooser chooser = host.chooser(tr("Choose other known-good runs"));
         chooser.setMultiSelectionEnabled(true);
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
@@ -602,10 +613,10 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         if (on) {
             followAfterReload = true;
             controller.reload();
-            statusMessage = "Live tail: following " + (controller.right() == null ? "the candidate"
-                    : controller.right().displayName());
+            statusMessage = controller.right() == null ? tr("Live tail: following the candidate")
+                    : tr("Live tail: following {0}", controller.right().displayName());
         } else {
-            statusMessage = "Live tail off";
+            statusMessage = tr("Live tail off");
         }
         host.tabChanged(this);
     }
@@ -634,7 +645,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
                 watcher.watch(files);
             }
         } catch (IOException e) {
-            statusMessage = "Cannot watch files: " + e.getMessage();
+            statusMessage = tr("Cannot watch files: {0}", e.getMessage());
             host.tabChanged(this);
         }
         if (watch && urls && liveTail) {
@@ -682,8 +693,11 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             next.add(new Bookmark(side, line.number(), line.text(), ""));
         }
         setBookmarks(next);
-        statusMessage = (removed ? "Removed bookmark from " : "Bookmarked ") + (left ? "baseline" : "candidate")
-                + " line " + line.number();
+        statusMessage = removed
+                ? (left ? tr("Removed bookmark from baseline line {0}", line.number())
+                        : tr("Removed bookmark from candidate line {0}", line.number()))
+                : (left ? tr("Bookmarked baseline line {0}", line.number())
+                        : tr("Bookmarked candidate line {0}", line.number()));
         host.tabChanged(this);
     }
 
@@ -719,9 +733,9 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         area.setLineWrap(true);
         area.setWrapStyleWord(true);
         JScrollPane scroll = new JScrollPane(area);
-        String title = (b.side() == Bookmark.Side.LEFT ? "Baseline" : "Candidate") + " line " + b.line();
+        String title = (b.side() == Bookmark.Side.LEFT ? tr("Baseline line {0}", b.line()) : tr("Candidate line {0}", b.line()));
         SwingUtilities.invokeLater(area::requestFocusInWindow);
-        if (JOptionPane.showConfirmDialog(this, scroll, "Note for " + title, JOptionPane.OK_CANCEL_OPTION,
+        if (JOptionPane.showConfirmDialog(this, scroll, tr("Note for {0}", title), JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
             return;
         }
@@ -778,7 +792,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             bookmarkNotes.put(DiffCanvas.key(b.side() == Bookmark.Side.LEFT, b.line()), b.note());
         }
         notesPanel.setBookmarks(bookmarks);
-        sidebar.setTitleAt(4, bookmarks.isEmpty() ? "Notes" : "Notes (" + bookmarks.size() + ")");
+        sidebar.setTitleAt(4, bookmarks.isEmpty() ? tr("Notes") : tr("Notes") + " (" + bookmarks.size() + ")");
         diffView.canvas().repaint();
         markDirty();
     }
@@ -835,15 +849,15 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     /// @return whether the session was saved
     public boolean saveSession(boolean saveAs) {
         if (controller.left() == null || controller.right() == null) {
-            JOptionPane.showMessageDialog(this, "Open two logs before saving a session.", "Save session",
+            JOptionPane.showMessageDialog(this, tr("Open two logs before saving a session."), tr("Save session"),
                     JOptionPane.INFORMATION_MESSAGE);
             return false;
         }
         Path target = sessionFile;
         if (target == null || saveAs) {
-            JFileChooser c = host.chooser("Save session");
+            JFileChooser c = host.chooser(tr("Save session"));
             c.resetChoosableFileFilters();
-            c.setFileFilter(new FileNameExtensionFilter("LogDelta sessions (*." + SessionIO.EXTENSION + ")",
+            c.setFileFilter(new FileNameExtensionFilter(tr("LogDelta sessions (*.{0})", SessionIO.EXTENSION),
                     SessionIO.EXTENSION));
             c.setSelectedFile(new File(c.getCurrentDirectory(), baseName() + "." + SessionIO.EXTENSION));
             if (c.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
@@ -867,12 +881,12 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             SessionIO.write(new Session(left, right, extras, controller.options(), bookmarks, notes), target);
             sessionFile = target;
             dirty = false;
-            statusMessage = "Saved session to " + target;
+            statusMessage = tr("Saved session to {0}", target);
             host.settings().setLastDirectory(dir);
             host.tabChanged(this);
             return true;
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Cannot save the session: " + e.getMessage(), "Save session",
+            JOptionPane.showMessageDialog(this, "Cannot save the session: " + e.getMessage(), tr("Save session"),
                     JOptionPane.ERROR_MESSAGE);
             return false;
         }
@@ -883,6 +897,16 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         if (s instanceof Source.Text t) {
             Path file = dir.resolve(fileName);
             Files.write(file, t.log().lines(), StandardCharsets.UTF_8);
+            return file.toString();
+        }
+        // Pasted text reopened from an earlier snapshot lives in the snapshot folder, whose old
+        // files are deleted once the new snapshot is written: keep a copy under the new name.
+        if (s instanceof Source.File f && dir.toAbsolutePath().normalize()
+                .equals(f.file().toAbsolutePath().normalize().getParent()) && Files.isRegularFile(f.file())) {
+            Path file = dir.resolve(fileName);
+            if (!file.equals(f.file())) {
+                Files.copy(f.file(), file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
             return file.toString();
         }
         return s.spec();
@@ -899,7 +923,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
     /// Opens the rule editor, optionally with a sample line.
     public void editRules(String sample) {
         RuleEditorDialog dialog = new RuleEditorDialog(SwingUtilities.getWindowAncestor(this),
-                controller.options().rules(), sample, host.theme().palette());
+                controller.options().rules(), sample, host.palette());
         RuleSet edited = dialog.showDialog();
         if (edited != null) {
             controller.setOptions(controller.options().toBuilder().rules(edited).build());
@@ -927,7 +951,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         String text = diffView.selectedText(side);
         if (text != null) {
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
-            statusMessage = "Copied to clipboard";
+            statusMessage = tr("Copied to clipboard");
             host.tabChanged(this);
         }
     }
@@ -938,9 +962,9 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         if (r == null) {
             return;
         }
-        String md = Reports.writer(ReportFormat.MARKDOWN).render(r, ReportOptions.DEFAULT.withMaxHunks(5));
+        String md = Reports.writer(ReportFormat.MARKDOWN).render(exportable(r), ReportOptions.DEFAULT.withMaxHunks(5));
         Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(md), null);
-        statusMessage = "Markdown summary copied to clipboard";
+        statusMessage = tr("Markdown summary copied to clipboard");
         host.tabChanged(this);
     }
 
@@ -950,7 +974,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         if (r == null) {
             return;
         }
-        JFileChooser c = host.chooser("Export " + format.displayName());
+        JFileChooser c = host.chooser(tr("Export {0}", tr(format.displayName())));
         c.resetChoosableFileFilters();
         c.setFileFilter(new FileNameExtensionFilter(format.displayName(), format.extension()));
         String base = stripExtension(r.leftFile().displayName()) + "-vs-" + stripExtension(r.rightFile().displayName());
@@ -963,17 +987,19 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
             target = target.resolveSibling(target.getFileName() + "." + format.extension());
         }
         if (Files.exists(target) && JOptionPane.showConfirmDialog(this, target.getFileName() + " exists. Replace it?",
-                "Export", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                tr("Export"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
         try {
             ReportOptions options = new ReportOptions(Math.max(3, context), format == ReportFormat.HTML, 0);
-            Reports.writeFile(r, format, options, target);
+            DiffResult out = exportable(r);
+            Reports.writeFile(out, format, options, target);
             host.settings().setLastDirectory(target.getParent());
-            statusMessage = "Exported " + format.displayName() + " to " + target;
+            statusMessage = tr("Exported {0} to {1}", tr(format.displayName()), target)
+                    + (out.redactedSecrets() > 0 ? " · " + tr("{0} secret(s) removed", out.redactedSecrets()) : "");
             host.tabChanged(this);
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Export failed: " + e.getMessage(), "Export",
+            JOptionPane.showMessageDialog(this, "Export failed: " + e.getMessage(), tr("Export"),
                     JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -986,28 +1012,28 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     /// Loads a profile into this comparison.
     public void loadProfile() {
-        JFileChooser c = host.chooser("Load profile");
+        JFileChooser c = host.chooser(tr("Load profile"));
         c.resetChoosableFileFilters();
-        c.setFileFilter(new FileNameExtensionFilter("LogDelta profiles (*." + ProfileIO.EXTENSION + ")",
+        c.setFileFilter(new FileNameExtensionFilter(tr("LogDelta profiles (*.{0})", ProfileIO.EXTENSION),
                 ProfileIO.EXTENSION));
         if (c.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
         try {
             controller.setOptions(ProfileIO.read(c.getSelectedFile().toPath()));
-            statusMessage = "Loaded profile " + c.getSelectedFile().getName();
+            statusMessage = tr("Loaded profile {0}", c.getSelectedFile().getName());
             host.tabChanged(this);
         } catch (IOException | ProfileParseException e) {
-            JOptionPane.showMessageDialog(this, "Cannot load profile:\n" + e.getMessage(), "Load profile",
+            JOptionPane.showMessageDialog(this, "Cannot load profile:\n" + e.getMessage(), tr("Load profile"),
                     JOptionPane.ERROR_MESSAGE);
         }
     }
 
     /// Saves this comparison's options as a profile.
     public void saveProfile() {
-        JFileChooser c = host.chooser("Save profile");
+        JFileChooser c = host.chooser(tr("Save profile"));
         c.resetChoosableFileFilters();
-        c.setFileFilter(new FileNameExtensionFilter("LogDelta profiles (*." + ProfileIO.EXTENSION + ")",
+        c.setFileFilter(new FileNameExtensionFilter(tr("LogDelta profiles (*.{0})", ProfileIO.EXTENSION),
                 ProfileIO.EXTENSION));
         c.setSelectedFile(new File(c.getCurrentDirectory(), "logdelta." + ProfileIO.EXTENSION));
         if (c.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
@@ -1019,10 +1045,10 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
         }
         try {
             ProfileIO.write(controller.options(), target);
-            statusMessage = "Saved profile to " + target;
+            statusMessage = tr("Saved profile to {0}", target);
             host.tabChanged(this);
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Cannot save profile: " + e.getMessage(), "Save profile",
+            JOptionPane.showMessageDialog(this, "Cannot save profile: " + e.getMessage(), tr("Save profile"),
                     JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -1034,16 +1060,16 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     private void showContextMenu(boolean leftSide, int x, int y) {
         JPopupMenu menu = new JPopupMenu();
-        menu.add(item("Copy " + (leftSide ? "Baseline" : "Candidate") + " Line", () -> copy(leftSide ? "left" : "right")));
-        menu.add(item("Copy Both Lines", () -> copy("both")));
+        menu.add(item(leftSide ? tr("Copy Baseline Line") : tr("Copy Candidate Line"), () -> copy(leftSide ? "left" : "right")));
+        menu.add(item(tr("Copy Both Lines"), () -> copy("both")));
         menu.addSeparator();
-        menu.add(item("Toggle Bookmark", () -> toggleBookmark(leftSide)));
-        menu.add(item("Bookmark Note…", this::editSelectedNote));
+        menu.add(item(tr("Toggle Bookmark"), () -> toggleBookmark(leftSide)));
+        menu.add(item(tr("Bookmark Note…"), this::editSelectedNote));
         menu.addSeparator();
-        menu.add(item("Ignore Lines Like This…", this::ignoreSelected));
-        menu.add(item("Test Line in Rule Editor…",
+        menu.add(item(tr("Ignore Lines Like This…"), this::ignoreSelected));
+        menu.add(item(tr("Test Line in Rule Editor…"),
                 () -> editRules(diffView.selectedText(leftSide ? "left" : "right"))));
-        menu.add(item("Find This Text", () -> {
+        menu.add(item(tr("Find This Text"), () -> {
             String t = diffView.selectedText(leftSide ? "left" : "right");
             if (t != null) {
                 diffView.openSearch(t.strip());
@@ -1062,7 +1088,7 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     /// Applies the theme and font.
     public void applyAppearance(Theme theme, float fontSize) {
-        DiffPalette p = theme.palette();
+        DiffPalette p = host.palette();
         diffView.setPalette(p);
         diffView.setEditorFont(Theme.monoFont(fontSize));
         welcome.setPalette(p);
@@ -1104,5 +1130,77 @@ public final class ComparisonTab extends JPanel implements AppTab, ComparisonCon
 
     private static String esc(String s) {
         return io.github.logdelta.core.util.Text.escapeHtml(s);
+    }
+
+    private static String fmt(int n) {
+        return String.format(Locale.ROOT, "%,d", n);
+    }
+
+    /// The result as it may leave the application: secrets removed unless the user turned that off.
+    private DiffResult exportable(DiffResult r) {
+        if (!host.settings().redactExports()) {
+            return r.redacted(io.github.logdelta.core.redact.Redactor.none().withPatterns(r.options().redactPatterns()));
+        }
+        return r.redacted(r.options().redactor());
+    }
+
+    /// Describes the fields that changed in the selected row of structured logs, for the status bar.
+    private void selectionChanged() {
+        DiffResult r = controller.result();
+        int row = diffView.selectedDiffRow();
+        if (r == null || row < 0 || row >= r.rows().size()) {
+            return;
+        }
+        var changes = r.fieldChanges(r.rows().get(row));
+        if (changes.isEmpty()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder(tr("Changed fields:")).append(' ');
+        for (int i = 0; i < changes.size() && i < 6; i++) {
+            sb.append(i == 0 ? "" : "; ").append(changes.get(i).describe());
+        }
+        if (changes.size() > 6) {
+            sb.append(" …");
+        }
+        statusMessage = io.github.logdelta.core.util.Text.truncate(sb.toString(), 240);
+        host.tabChanged(this);
+    }
+
+    /// Saves this tab as a session in `dir` so it can be reopened on the next start.
+    ///
+    /// @return the session file, or `null` if there is nothing to save
+    public Path snapshot(Path dir, String stem) throws IOException {
+        if (controller.left() == null || controller.right() == null) {
+            return null;
+        }
+        Files.createDirectories(dir);
+        Path target = dir.resolve(stem + "." + SessionIO.EXTENSION);
+        String left = specFor(controller.left(), dir, stem + "-baseline.log");
+        String right = specFor(controller.right(), dir, stem + "-candidate.log");
+        List<String> extras = new ArrayList<>();
+        int n = 2;
+        for (Source s : controller.extraBaselines()) {
+            extras.add(specFor(s, dir, stem + "-baseline-" + n++ + ".log"));
+        }
+        SessionIO.write(new Session(left, right, extras, controller.options(), bookmarks, notes), target);
+        return target;
+    }
+
+    /// Restores a snapshot written by [#snapshot]: like [#loadSession], but the tab keeps no link to
+    /// the snapshot file (saving asks for a new location) and unsaved bookmarks stay marked as such.
+    public void restoreSnapshot(Session s, boolean wasDirty, Path originalSession) {
+        loadSession(s, originalSession);
+        dirty = wasDirty;
+        host.tabChanged(this);
+    }
+
+    /// The session file this tab was loaded from or saved to, or `null`.
+    public Path sessionFile() {
+        return sessionFile;
+    }
+
+    /// Whether bookmarks or notes changed since the last save.
+    public boolean isDirty() {
+        return dirty;
     }
 }

@@ -7,6 +7,20 @@ Profile As**), so a team can keep one per service in its repository.
 The GUI also saves the active setup as a profile in `~/.logdelta/session.ldprofile` and restores
 it on the next start. [Session files](SESSIONS.md) embed a profile too.
 
+## Automatic profiles
+
+The CLI picks up a profile without `-p` when the working folder, or any parent up to the
+repository root (the first folder containing `.git`), has either
+
+- a file named `.logdelta`, or
+- a folder `.logdelta/` containing `profile.ldprofile`.
+
+The search also stops at your home folder, and folders that every user may write to (such
+as `/tmp`) are skipped, so nobody else can slip a profile into your comparisons. It prints
+`logdelta: using profile PATH` to standard error (unless `-q`). An explicit `-p` wins;
+`--no-profile` or the environment variable `LOGDELTA_AUTO_PROFILE=0` turns the search off.
+Commit the file next to your code so everyone, and CI, compares runs the same way.
+
 ## Example
 
 ```ini
@@ -63,11 +77,21 @@ replacement = $1<AMOUNT>
 | `multiline-entries` | boolean; compare a line and its continuation lines (stack traces) as one entry | `false` |
 | `builtins` | boolean; `off` disables every built-in rule not enabled explicitly below | `on` |
 | `order` | comma-separated rule ids; listed rules run first in that order, the rest keep their position | (none) |
+| `log-format` | `auto`, `plain`, `json`, `logfmt` | `auto` |
+| `ignore-fields` | comma-separated JSON/logfmt field names or globs (`*.id`); an undotted name also matches the last part of a nested name | timestamps and trace/span ids |
+| `preset` | `auto`, `none` or a preset id (`spring-boot`, `access-log`, `kubernetes`, `journald`, `logcat`, `python`) | `auto` |
+| `since`, `until` | a date-time (`2026-11-12T08:49`), a time of day (`08:49:03`) or an offset from the first line (`+5m`, `+90s`, `+1h30m`) | whole log |
+| `redact` | boolean; remove secrets from exported reports | `true` |
 
 ### `[ignore]`
 
 Repeat `pattern = REGEX` once per pattern. A line is left out of the comparison when any pattern
 is found anywhere in it.
+
+### `[redact]`
+
+Repeat `pattern = REGEX` once per pattern. Matches are replaced with `[REDACTED]` in
+exported reports, in addition to the built-in detectors (see [Reports](REPORTS.md#secrets-in-reports)).
 
 ### `[rule ID]`
 
@@ -87,6 +111,13 @@ For a **custom** rule:
 | `description` | no | free text |
 
 Custom rules run before the built-in ones, in file order, unless `order` says otherwise.
+
+Rules of a [preset](RULES.md#presets) are switched off the same way as built-in ones, by id:
+
+```ini
+[rule spring-boot.pid]
+enabled = false
+```
 
 ## Errors
 

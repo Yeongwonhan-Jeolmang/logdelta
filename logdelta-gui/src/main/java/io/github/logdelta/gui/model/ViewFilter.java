@@ -6,6 +6,8 @@ package io.github.logdelta.gui.model;
 import java.util.Locale;
 import java.util.Objects;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Restricts which rows the comparison view shows.
 ///
 /// @param mode which kind of rows to keep
@@ -35,7 +37,7 @@ public record ViewFilter(Mode mode, String text) {
 
         /// Label for the filter bar.
         public String label() {
-            return label;
+            return tr(label);
         }
     }
 

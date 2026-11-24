@@ -27,6 +27,8 @@ import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Shown until two files are selected: explains what to do, offers the bundled example and
 /// lists recent comparisons.
 public final class WelcomePanel extends JPanel {
@@ -50,16 +52,16 @@ public final class WelcomePanel extends JPanel {
 
         JLabel title = new JLabel(Version.NAME);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 28f));
-        JLabel tagline = new JLabel("Compare two logs while ignoring what always changes.");
+        JLabel tagline = new JLabel(tr("Compare two logs while ignoring what always changes."));
         tagline.setFont(tagline.getFont().deriveFont(15f));
-        JLabel hint = new JLabel("<html><div style='width:420px'>Timestamps, UUIDs, thread ids, memory "
+        JLabel hint = new JLabel("<html><div style='width:420px'>" + tr("Timestamps, UUIDs, thread ids, memory "
                 + "addresses and other run-specific values are masked before comparing, so only real "
-                + "differences remain. Drop two log files anywhere in this window to start.</div></html>");
+                + "differences remain. Drop two log files anywhere in this window to start.") + "</div></html>");
 
-        JButton open = new JButton("Open logs…");
+        JButton open = new JButton(tr("Open logs…"));
         open.addActionListener(_ -> onOpen.run());
-        JButton example = new JButton("Try the example");
-        example.setToolTipText("Compare two bundled logs of a checkout service that started failing");
+        JButton example = new JButton(tr("Try the example"));
+        example.setToolTipText(tr("Compare two bundled logs of a checkout service that started failing"));
         example.addActionListener(_ -> onExample.run());
         JPanel buttons = new JPanel();
         buttons.setOpaque(false);
@@ -112,7 +114,7 @@ public final class WelcomePanel extends JPanel {
     public void setRecent(List<RecentPair> recent) {
         recentList.removeAll();
         if (!recent.isEmpty()) {
-            JLabel header = new JLabel("RECENT");
+            JLabel header = new JLabel(tr("RECENT"));
             header.setFont(header.getFont().deriveFont(Font.BOLD, 11f));
             header.setForeground(palette.lineNumber());
             header.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));

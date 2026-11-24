@@ -49,8 +49,9 @@ public final class SideBySideRenderer {
     /// @param context  unchanged lines around each change
     /// @param maxHunks maximum number of hunks, or `0` for all
     public void render(DiffResult result, int context, int maxHunks, PrintStream out) {
-        int digits = Math.max(3, String.valueOf(Math.max(result.leftFile().lineCount(),
-                result.rightFile().lineCount())).length());
+        int digits = Math.max(3, String.valueOf(Math.max(
+                result.leftFile().lineNumber(result.leftFile().lineCount()),
+                result.rightFile().lineNumber(result.rightFile().lineCount()))).length());
         int column = (width - separator.length()) / 2;
         int textWidth = column - digits - 3;
 

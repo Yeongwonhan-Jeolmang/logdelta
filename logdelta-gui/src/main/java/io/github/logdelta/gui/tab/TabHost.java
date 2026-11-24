@@ -6,6 +6,7 @@ package io.github.logdelta.gui.tab;
 import io.github.logdelta.core.engine.DiffOptions;
 import io.github.logdelta.gui.model.Source;
 import io.github.logdelta.gui.settings.AppSettings;
+import io.github.logdelta.gui.theme.DiffPalette;
 import io.github.logdelta.gui.theme.Theme;
 
 import javax.swing.JFileChooser;
@@ -19,6 +20,11 @@ public interface TabHost {
 
     /// The active theme.
     Theme theme();
+
+    /// The diff colours in use: the theme's palette, colour-blind safe if so configured.
+    default DiffPalette palette() {
+        return theme().palette(settings().colorBlindSafe());
+    }
 
     /// The tab's title, status, busy state or available actions changed.
     void tabChanged(AppTab tab);

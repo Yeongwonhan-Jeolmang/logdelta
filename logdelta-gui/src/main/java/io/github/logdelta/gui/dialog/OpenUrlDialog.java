@@ -18,6 +18,8 @@ import java.awt.Insets;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Asks for a baseline and a candidate given as URLs (or paths), with an optional request
 /// header for servers that need authentication, such as a CI system's artifact store.
 public final class OpenUrlDialog {
@@ -43,7 +45,7 @@ public final class OpenUrlDialog {
         JPasswordField headerValue = new JPasswordField(30);
         left.putClientProperty("JTextField.placeholderText", "https://ci.example.com/job/41/artifact/app.log");
         right.putClientProperty("JTextField.placeholderText", "https://ci.example.com/job/42/artifact/app.log");
-        headerValue.setToolTipText("Optional, e.g. 'Bearer <token>'. Kept in memory only; never saved.");
+        headerValue.setToolTipText(tr("Optional, e.g. 'Bearer <token>'. Kept in memory only; never saved."));
         String clip = clipboardUrl();
         if (clip != null) {
             right.setText(clip);
@@ -54,8 +56,8 @@ public final class OpenUrlDialog {
         c.insets = new Insets(4, 4, 4, 4);
         c.anchor = GridBagConstraints.WEST;
         c.fill = GridBagConstraints.HORIZONTAL;
-        row(p, c, 0, "Baseline", left);
-        row(p, c, 1, "Candidate", right);
+        row(p, c, 0, tr("Baseline"), left);
+        row(p, c, 1, tr("Candidate"), right);
         c.gridy = 2;
         c.gridx = 0;
         c.gridwidth = 2;
@@ -70,9 +72,9 @@ public final class OpenUrlDialog {
         header.add(headerName, h);
         h.weightx = 1;
         header.add(headerValue, h);
-        row(p, c, 3, "Header", header);
+        row(p, c, 3, tr("Header"), header);
 
-        int answer = JOptionPane.showConfirmDialog(parent, p, "Open URLs", JOptionPane.OK_CANCEL_OPTION,
+        int answer = JOptionPane.showConfirmDialog(parent, p, tr("Open URLs"), JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.PLAIN_MESSAGE);
         if (answer != JOptionPane.OK_OPTION) {
             return null;
@@ -90,7 +92,7 @@ public final class OpenUrlDialog {
             }
             return new Result(l, r, options);
         } catch (IllegalArgumentException e) {
-            JOptionPane.showMessageDialog(parent, e.getMessage(), "Open URLs", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(parent, e.getMessage(), tr("Open URLs"), JOptionPane.ERROR_MESSAGE);
             return null;
         }
     }

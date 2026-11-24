@@ -40,6 +40,8 @@ import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// A short first-run tour: the window is dimmed except for a spotlight on one part of it, and a
 /// card next to the spotlight explains that part. The spotlight glides from step to step.
 ///
@@ -58,25 +60,29 @@ public final class Tour extends JComponent {
     }
 
     private static final List<Step> STEPS = List.of(
-            new Step(null, "Welcome to " + Version.NAME,
-                    "LogDelta compares two runs of the same program and hides what always changes — "
-                            + "timestamps, ids, durations — so the real differences stand out."),
-            new Step("tour.filebar", "Pick the two runs",
-                    "Drop logs here, or type a path or URL. <b>+ Baselines</b> adds more good runs: "
-                            + "anything they also do is shown faded as normal variation."),
-            new Step("tour.toolbar", "Move through the changes",
-                    "<b>F7</b> jumps to the next change, <b>F8</b> to the next new problem. The toggles wrap "
+            new Step(null, tr("Welcome to {0}", Version.NAME),
+                    tr("LogDelta compares two runs of the same program and hides what always changes — "
+                            + "timestamps, ids, durations — so the real differences stand out.")),
+            new Step("tour.filebar", tr("Pick the two runs"),
+                    tr("Drop logs here, or type a path or URL. <b>+ Baselines</b> adds more good runs: "
+                            + "anything they also do is shown faded as normal variation.")),
+            new Step("tour.toolbar", tr("Move through the changes"),
+                    tr("<b>F7</b> jumps to the next change, <b>F8</b> to the next new problem. The toggles wrap "
                             + "long lines, show elapsed time, and turn on live tail for logs that are still "
-                            + "being written."),
-            new Step("tour.filter", "Narrow it down",
-                    "Show only changes, only new problems or only errors, or type a word to keep the lines "
-                            + "that contain it. <b>Ctrl+L</b> jumps here."),
-            new Step("tour.sidebar", "Let it point the way",
-                    "<b>Insights</b> lists new errors, <b>Timing</b> the phases that got slower, <b>Rules</b> "
-                            + "suggests masks for noise, and <b>Notes</b> keeps your bookmarks (<b>Ctrl+B</b>)."),
-            new Step(null, "That’s it",
-                    "Save the comparison with your notes as a session (<b>Ctrl+S</b>). You can replay this "
-                            + "tour from <b>Help › Take the Tour</b>."));
+                            + "being written.")),
+            new Step("tour.filter", tr("Narrow it down"),
+                    tr("Show only changes, only new problems or only errors, or type a word to keep the lines "
+                            + "that contain it. <b>Ctrl+L</b> jumps here.")),
+            new Step("tour.sidebar", tr("Let it point the way"),
+                    tr("<b>Insights</b> lists new errors, <b>Timing</b> the phases that got slower, <b>Rules</b> "
+                            + "suggests masks for noise, and <b>Notes</b> keeps your bookmarks (<b>Ctrl+B</b>).")),
+            new Step(null, tr("Find any command"),
+                    tr("Press <b>Ctrl+Shift+P</b> and type a few letters to run any command; <b>F1</b> lists "
+                            + "every shortcut. JSON and logfmt logs are compared field by field, and the "
+                            + "<b>Rules</b> tab can limit a comparison to a time window.")),
+            new Step(null, tr("That’s it"),
+                    tr("Save the comparison with your notes as a session (<b>Ctrl+S</b>). You can replay this "
+                            + "tour from <b>Help › Take the Tour</b>.")));
 
     private static final int PAD = 8;
     private static final int ANIMATION_MS = 220;
@@ -89,9 +95,9 @@ public final class Tour extends JComponent {
     private final JLabel heading = new JLabel();
     private final JLabel text = new JLabel();
     private final JLabel counter = new JLabel();
-    private final JButton back = new JButton("Back");
-    private final JButton next = new JButton("Next");
-    private final JButton example = new JButton("Load the example");
+    private final JButton back = new JButton(tr("Back"));
+    private final JButton next = new JButton(tr("Next"));
+    private final JButton example = new JButton(tr("Load the example"));
     private int index;
     private Rectangle from;
     private Rectangle to;
@@ -159,13 +165,13 @@ public final class Tour extends JComponent {
         JPanel buttons = new JPanel();
         buttons.setOpaque(false);
         buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        JButton skip = new JButton("Skip tour");
+        JButton skip = new JButton(tr("Skip tour"));
         skip.setBorderPainted(false);
         skip.setContentAreaFilled(false);
         skip.addActionListener(_ -> finish());
         back.addActionListener(_ -> go(index - 1));
         next.addActionListener(_ -> go(index + 1));
-        example.setToolTipText("Open the bundled example so the next steps have something to show");
+        example.setToolTipText(tr("Open the bundled example so the next steps have something to show"));
         example.addActionListener(_ -> {
             loadExample.run();
             example.setEnabled(false);
@@ -205,7 +211,7 @@ public final class Tour extends JComponent {
         text.setText("<html><div style='width:330px'>" + step.body() + "</div></html>");
         counter.setText(dots(i));
         back.setVisible(i > 0);
-        next.setText(i == STEPS.size() - 1 ? "Done" : "Next");
+        next.setText(i == STEPS.size() - 1 ? tr("Done") : tr("Next"));
         example.setVisible(i == 0);
         example.setEnabled(true);
         SwingUtilities.getRootPane(next).setDefaultButton(next);

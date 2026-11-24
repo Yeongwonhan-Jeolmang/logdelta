@@ -11,6 +11,7 @@ import io.github.logdelta.gui.theme.Theme;
 
 import java.awt.Rectangle;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -45,16 +46,130 @@ public final class AppSettings {
     private static final String SYNTAX = "syntaxColoring";
     private static final String ELAPSED = "showElapsedTime";
     private static final String TOUR = "tourShownVersion";
+    private static final String COLOR_BLIND = "colorBlindSafe";
+    private static final String LANGUAGE = "language";
+    private static final String RESTORE_TABS = "restoreTabs";
+    private static final String UPDATE_CHECK = "checkForUpdates";
+    private static final String LAST_UPDATE_CHECK = "lastUpdateCheck";
+    private static final String REDACT = "redactExports";
+    private static final String OPEN_TABS_FILE = "tabs.list";
+    private static final String SELECTED_TAB = "selectedTab";
     /// Bumped when the tour gains content worth showing to existing users.
-    private static final int TOUR_VERSION = 1;
+    private static final int TOUR_VERSION = 2;
 
     private final Preferences prefs;
     private final Path sessionProfile;
+    private final Path configDir;
 
     /// Settings stored under the given preferences node and configuration directory.
     public AppSettings(Preferences prefs, Path configDir) {
         this.prefs = prefs;
+        this.configDir = configDir;
         this.sessionProfile = configDir.resolve("session." + ProfileIO.EXTENSION);
+    }
+
+    /// Folder for files the application keeps between runs (`~/.logdelta`).
+    public Path configDir() {
+        return configDir;
+    }
+
+    /// Folder where the tabs open at exit are saved as sessions.
+    public Path openTabsDir() {
+        return configDir.resolve("open-tabs");
+    }
+
+    /// Whether the diff uses colours that stay distinct with colour vision deficiencies.
+    public boolean colorBlindSafe() {
+        return prefs.getBoolean(COLOR_BLIND, false);
+    }
+
+    public void setColorBlindSafe(boolean v) {
+        prefs.putBoolean(COLOR_BLIND, v);
+    }
+
+    /// Interface language: `system` or a code from [io.github.logdelta.gui.i18n.I18n#LANGUAGES].
+    public String language() {
+        return prefs.get(LANGUAGE, "system");
+    }
+
+    public void setLanguage(String code) {
+        prefs.put(LANGUAGE, code);
+    }
+
+    /// Whether the tabs open at exit are reopened on the next start.
+    public boolean restoreTabs() {
+        return prefs.getBoolean(RESTORE_TABS, true);
+    }
+
+    public void setRestoreTabs(boolean v) {
+        prefs.putBoolean(RESTORE_TABS, v);
+    }
+
+    /// Whether to look for a newer release on start (opt-in; off by default).
+    public boolean checkForUpdates() {
+        return prefs.getBoolean(UPDATE_CHECK, false);
+    }
+
+    public void setCheckForUpdates(boolean v) {
+        prefs.putBoolean(UPDATE_CHECK, v);
+    }
+
+    /// When the last automatic update check ran (epoch milliseconds, 0 if never).
+    public long lastUpdateCheck() {
+        return prefs.getLong(LAST_UPDATE_CHECK, 0);
+    }
+
+    public void setLastUpdateCheck(long millis) {
+        prefs.putLong(LAST_UPDATE_CHECK, millis);
+    }
+
+    /// Whether exported reports and copied summaries have secrets removed.
+    public boolean redactExports() {
+        return prefs.getBoolean(REDACT, true);
+    }
+
+    public void setRedactExports(boolean v) {
+        prefs.putBoolean(REDACT, v);
+    }
+
+    /// The tabs open at exit, as lines `session <file>` or `folder <left>\t<right>`.
+    public List<String> openTabs() {
+        List<String> out = new ArrayList<>();
+        try {
+            Path list = openTabsDir().resolve(OPEN_TABS_FILE);
+            if (Files.isRegularFile(list)) {
+                for (String line : Files.readAllLines(list, StandardCharsets.UTF_8)) {
+                    if (!line.isBlank()) {
+                        out.add(line);
+                    }
+                }
+            }
+        } catch (IOException _) {
+            // nothing to reopen
+        }
+        return out;
+    }
+
+    /// Remembers the open tabs. They are kept in a file next to the snapshots rather than in the
+    /// preferences, whose values are limited to 8 KB.
+    public void setOpenTabs(List<String> tabs, int selected) {
+        try {
+            Path list = openTabsDir().resolve(OPEN_TABS_FILE);
+            if (tabs.isEmpty()) {
+                Files.deleteIfExists(list);
+            } else {
+                Files.createDirectories(list.getParent());
+                Files.write(list, tabs, StandardCharsets.UTF_8);
+            }
+        } catch (IOException _) {
+            // best effort: the tabs are simply not reopened
+        }
+        prefs.putInt(SELECTED_TAB, selected);
+    }
+
+    /// Index of the tab that was selected at exit.
+    public int selectedTab() {
+        return prefs.getInt(SELECTED_TAB, 0);
     }
 
     /// The settings of the current user.

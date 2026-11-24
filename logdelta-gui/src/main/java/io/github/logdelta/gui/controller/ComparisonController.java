@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Owns the state of one comparison (sources, extra baselines, options, result) and runs
 /// comparisons on a background thread.
 ///
@@ -262,7 +264,7 @@ public final class ComparisonController {
 
         private LogFile read(Source s, ProgressListener progress, int index, int total) throws java.io.IOException {
             double from = 0.3 * index / total;
-            String stage = "Reading " + s.displayName();
+            String stage = tr("Reading {0}", s.displayName());
             progress.onProgress(stage, from);
             return switch (s) {
                 case Source.File(Path p) -> {
@@ -302,13 +304,13 @@ public final class ComparisonController {
 
     private static String describe(Throwable t) {
         return switch (t) {
-            case NoSuchFileException e -> "File not found: " + e.getMessage();
-            case java.net.http.HttpTimeoutException _ -> "The server did not answer in time.";
-            case java.net.ConnectException _ -> "Cannot connect: " + t.getMessage();
+            case NoSuchFileException e -> tr("File not found: {0}", e.getMessage());
+            case java.net.http.HttpTimeoutException _ -> tr("The server did not answer in time.");
+            case java.net.ConnectException _ -> tr("Cannot connect: {0}", t.getMessage());
             case java.io.IOException e when e.getMessage() != null && e.getMessage().startsWith("HTTP ") ->
                     e.getMessage();
-            case java.nio.file.AccessDeniedException e -> "Permission denied: " + e.getMessage();
-            case OutOfMemoryError _ -> "Not enough memory for these files. Start LogDelta with a larger heap, e.g. -Xmx4g.";
+            case java.nio.file.AccessDeniedException e -> tr("Permission denied: {0}", e.getMessage());
+            case OutOfMemoryError _ -> tr("Not enough memory for these files. Compare a time window (Rules tab), or start LogDelta with a larger heap, e.g. -Xmx8g.");
             default -> t.getClass().getSimpleName() + (t.getMessage() == null ? "" : ": " + t.getMessage());
         };
     }

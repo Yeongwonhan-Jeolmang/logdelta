@@ -37,6 +37,8 @@ import java.awt.event.KeyEvent;
 import java.util.List;
 import java.util.Locale;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// The comparison view: file header, [FilterBar], [DiffCanvas] in a scroll pane,
 /// [OverviewRuler], shared horizontal scroll bar and [SearchBar].
 ///
@@ -430,7 +432,7 @@ public final class DiffView extends JPanel {
         } else if (query.isEmpty()) {
             searchBar.setStatus(" ", false);
         } else if (search.size() == 0) {
-            searchBar.setStatus("No matches", true);
+            searchBar.setStatus(tr("No matches"), true);
         } else {
             // Start from the first match at or after the current position.
             int from = selectedDiffRow();

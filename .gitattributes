@@ -1,5 +1,7 @@
 * text=auto eol=lf
 *.ps1 text eol=crlf
+*.cmd text eol=crlf
+mvnw text eol=lf
 *.png binary
 *.gz binary
 # Example logs must stay byte-for-byte identical.

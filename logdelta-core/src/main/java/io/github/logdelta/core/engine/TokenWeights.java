@@ -21,7 +21,7 @@ final class TokenWeights {
     /// Weights that treat every token equally (used when nothing else is available).
     static final TokenWeights UNIFORM = new TokenWeights(Map.of(), 0);
 
-    private static final double FLOOR = 0.05;
+    static final double FLOOR = 0.05;
 
     private final Map<String, Integer> documentFrequency;
     private final int documents;

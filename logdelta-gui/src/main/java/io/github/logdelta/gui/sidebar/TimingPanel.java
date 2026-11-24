@@ -28,6 +28,8 @@ import java.awt.event.MouseEvent;
 import java.util.Locale;
 import java.util.function.IntConsumer;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Sidebar tab answering "where did the time go?": run durations and the phases between
 /// matching lines that got notably slower or faster. Selecting a phase jumps to where it starts.
 public final class TimingPanel extends JPanel {
@@ -35,7 +37,7 @@ public final class TimingPanel extends JPanel {
     private final JLabel overview = new JLabel();
     private final JLabel coverage = new JLabel();
     private final DefaultListModel<Entry> phases = new DefaultListModel<>();
-    private final JLabel caption = Section.caption("Phases");
+    private final JLabel caption = Section.caption(tr("Phases"));
     private DiffPalette palette = DiffPalette.LIGHT;
 
     private record Entry(PhaseChange phase, boolean slower) {
@@ -86,27 +88,28 @@ public final class TimingPanel extends JPanel {
     public void show(DiffResult r) {
         phases.clear();
         if (r == null) {
-            overview.setText("No comparison yet");
+            overview.setText(tr("No comparison yet"));
             coverage.setText(" ");
-            caption.setText("Phases");
+            caption.setText(tr("Phases"));
             return;
         }
         TimingAnalysis t = r.timing();
         if (!t.available()) {
-            overview.setText("No timestamps found");
-            coverage.setText("<html>Timing needs ISO, syslog, Apache or time-of-day timestamps at the start "
-                    + "of lines.</html>");
-            caption.setText("Phases");
+            overview.setText(tr("No timestamps found"));
+            coverage.setText("<html>" + tr("Timing needs ISO, syslog, Apache or time-of-day timestamps at the "
+                    + "start of lines.") + "</html>");
+            caption.setText(tr("Phases"));
             return;
         }
-        overview.setText("Run took " + Timeline.format(t.left().duration()) + " → "
-                + Timeline.format(t.right().duration()));
-        coverage.setText(String.format(Locale.ROOT, "Timestamps on %.0f%% / %.0f%% of lines",
-                t.left().coverage() * 100, t.right().coverage() * 100));
+        overview.setText(tr("Run took {0} → {1}", Timeline.format(t.left().duration()),
+                Timeline.format(t.right().duration())));
+        coverage.setText(tr("Timestamps on {0}% / {1}% of lines",
+                String.format(Locale.ROOT, "%.0f", t.left().coverage() * 100),
+                String.format(Locale.ROOT, "%.0f", t.right().coverage() * 100)));
         t.slower().forEach(p -> phases.addElement(new Entry(p, true)));
         t.faster().forEach(p -> phases.addElement(new Entry(p, false)));
-        caption.setText(String.format(Locale.ROOT, "Phases  (%d slower, %d faster)", t.slower().size(),
-                t.faster().size()));
+        caption.setText(tr("Phases") + "  (" + tr("{0} slower, {1} faster", t.slower().size(),
+                t.faster().size()) + ")");
     }
 
     /// Number of slower phases shown, for the tab title.

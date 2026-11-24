@@ -55,6 +55,33 @@ when sizes or counters are known noise.
 
 To list the rules with their patterns: `logdelta rules -v`.
 
+## Presets
+
+A preset adds rules for one well-known log format. It is chosen automatically when at least half
+of the sampled lines look like that format (`--preset auto`, the default), or explicitly with
+`--preset ID` or the **Format** section of the app's Rules tab. Preset rules run before the
+built-in ones and can be switched off one by one (`--disable spring-boot.pid`, or
+`[rule spring-boot.pid]` `enabled = false` in a profile).
+
+| Preset | Recognises | Rules |
+|---|---|---|
+| `spring-boot` | Spring Boot console lines: `timestamp LEVEL pid --- [thread] logger : message` | `pid`, `reactor-thread`, `uptime` |
+| `access-log` | nginx / Apache common and combined access logs | `bytes`, `timing`, `trailing-time`, `cache-buster` |
+| `kubernetes` | CRI container logs (containerd, CRI-O) and klog lines | `cri-prefix`, `klog-header`, `node-name`, `resource-version` |
+| `journald` | `journalctl` output and syslog files | `host`, `host-iso`, `kernel-uptime`, `session` |
+| `logcat` | `adb logcat` in the threadtime and brief formats | `ids`, `date`, `brief-pid` |
+| `python` | Python `logging` default and `asctime - name - LEVEL - message` formats | `worker`, `server-pid` |
+
+`logdelta rules --presets` prints this list with each rule's description; `logdelta rules
+--preset logcat -v` shows the patterns.
+
+## Structured logs
+
+JSON lines and logfmt are not compared as text. Each line is split into fields, ignored fields
+(timestamps and trace/span ids by default, see `--ignore-field`) are masked as `<IGNORED>`, the
+rest are sorted by name, and the rules above run over the values. So
+`{"user":"a","ts":1,"msg":"hi"}` and `{"msg":"hi","ts":2,"user":"a"}` are equal.
+
 ## Writing your own rules
 
 A rule has:

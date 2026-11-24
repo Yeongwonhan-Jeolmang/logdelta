@@ -142,7 +142,8 @@ public final class JUnitReportWriter implements ReportWriter {
                     .append("\">\n");
             out.append("      <failure type=\"NewProblem\" message=\"").append(attr("New " + p.severity().label()
                     + " in candidate line " + p.lineNumber() + (p.lines() > 1 ? " (+" + (p.lines() - 1)
-                    + " lines)" : ""))).append("\">").append(Text.escapeXml(p.text())).append("</failure>\n");
+                    + " lines)" : "") + (p.repeated() ? "; " + p.occurrences() + " occurrences of " + p.template()
+                    : ""))).append("\">").append(Text.escapeXml(p.text())).append("</failure>\n");
             out.append("    </testcase>\n");
         }
     }

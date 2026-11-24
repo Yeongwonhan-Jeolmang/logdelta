@@ -85,6 +85,15 @@ public final class DiffCommand implements Command {
                 Exit status: 0 = no differences, 1 = differences, 2 = error.
                 With --exit-code problems, 1 is returned only if new warnings/errors appear.
 
+                Structured logs: JSON lines and logfmt are detected automatically and compared
+                field by field; timestamps and trace/span ids are ignored by default.
+                Known formats (Spring Boot, nginx, Kubernetes, journald, logcat, Python) are
+                recognised and their run-specific parts masked; see 'logdelta rules --presets'.
+
+                Reports (html, json, markdown, junit, unified) have secrets and e-mail addresses
+                removed; terminal output is left as it is. A .logdelta profile in the current
+                folder or a parent folder is used automatically (--no-profile to skip it).
+
                 Examples:
                   logdelta good.log bad.log
                   logdelta -f summary -I heartbeat run1.log.gz run2.log.gz
@@ -92,6 +101,8 @@ public final class DiffCommand implements Command {
                   logdelta -p team.ldprofile -f html -o report.html good.log bad.log
                   logdelta --include '*.log' logs/release-41 logs/release-42
                   logdelta -H 'Authorization: Bearer $TOKEN' https://ci.example.com/a.log b.log
+                  logdelta --since +2m --until +5m huge-good.log huge-bad.log
+                  logdelta --ignore-field requestId good.jsonl bad.jsonl
                 """;
     }
 
@@ -127,7 +138,7 @@ public final class DiffCommand implements Command {
     @Override
     public int execute(ParsedArgs args, CliContext ctx) throws Exception {
         List<String> inputs = new ArrayList<>(args.positionals());
-        DiffOptions base = DiffOptions.defaults();
+        DiffOptions base = null;
         if (args.has("session")) {
             if (!inputs.isEmpty()) {
                 throw new UsageException("--session cannot be combined with input files");
@@ -179,11 +190,14 @@ public final class DiffCommand implements Command {
                     ctx.resolve(inputs.getLast()), options, Inputs.folderOptions(args), progress,
                     CancellationToken.NEVER);
             StderrProgress.clear(progress);
+            FolderComparison exported = c.redacted(options.redactor());
             if (!args.has("quiet")) {
-                emitFolder(c, folderFormat(args), Ansi.of(color), glyphs, width, outFile, ctx);
+                String ff = folderFormat(args);
+                emitFolder(ff.equals(SUMMARY) && outFile == null ? c : exported, ff, Ansi.of(color), glyphs, width,
+                        outFile, ctx);
             }
             for (Outputs.Target t : reports) {
-                t.write(c, ctx);
+                t.write(exported, ctx);
             }
             return switch (exitMode) {
                 case "never" -> ExitCode.OK;
@@ -203,12 +217,18 @@ public final class DiffCommand implements Command {
         DiffResult result = new LogDeltaEngine().compare(logs.getFirst(), logs.subList(1, logs.size() - 1),
                 logs.getLast(), options, progress, CancellationToken.NEVER);
         StderrProgress.clear(progress);
+        Outputs.warnAboutWindow(result, ctx, args.has("quiet"));
 
+        // Only what is shown on the terminal keeps secrets; anything written to a file is a report.
+        boolean terminalFormat = (format.equals(SIDE_BY_SIDE) || format.equals(SUMMARY)) && outFile == null;
+        DiffResult exported = !reports.isEmpty() || !terminalFormat && !args.has("quiet")
+                ? Outputs.exportable(result, ctx, args.has("quiet")) : result;
         if (!args.has("quiet")) {
-            emit(result, format, reportOptions, Ansi.of(color), glyphs, width, outFile, ctx);
+            emit(terminalFormat ? result : exported, format, reportOptions, Ansi.of(color), glyphs, width, outFile,
+                    ctx);
         }
         for (Outputs.Target t : reports) {
-            t.write(result, reportOptions, ctx);
+            t.write(exported, reportOptions, ctx);
         }
         return switch (exitMode) {
             case "never" -> ExitCode.OK;
@@ -300,6 +320,7 @@ public final class DiffCommand implements Command {
             text = FolderReports.render(c, ReportFormat.parse(format));
         }
         if (outFile != null) {
+            Outputs.createParent(outFile);
             Files.writeString(outFile, text, StandardCharsets.UTF_8);
             ctx.err().println("Wrote " + format + " to " + outFile);
         } else {
@@ -320,6 +341,7 @@ public final class DiffCommand implements Command {
             }
             ps.flush();
             if (outFile != null) {
+                Outputs.createParent(outFile);
                 Files.write(outFile, buffer.toByteArray());
             }
             return;

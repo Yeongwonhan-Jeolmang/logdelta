@@ -15,12 +15,14 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Bottom bar: a message on the left, progress while comparing, details on the right.
 public final class StatusBar extends JPanel {
 
-    private final JLabel message = new JLabel("Ready");
+    private final JLabel message = new JLabel(tr("Ready"));
     private final JProgressBar progress = new JProgressBar(0, 1000);
-    private final JButton cancel = new JButton("Cancel");
+    private final JButton cancel = new JButton(tr("Cancel"));
     private final JLabel details = new JLabel();
 
     /// @param onCancel invoked when the user cancels a running comparison

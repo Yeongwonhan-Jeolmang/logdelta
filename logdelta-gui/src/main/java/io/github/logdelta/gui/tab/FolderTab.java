@@ -54,6 +54,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Compares two folders of logs. Every file is listed with its similarity and its number of new
 /// problems, files that need attention first; double-clicking a row opens that pair side by
 /// side in a new tab.
@@ -71,7 +73,7 @@ public final class FolderTab extends JPanel implements AppTab {
     private FolderComparison result;
     private Worker running;
 
-    private String statusMessage = "Choose two folders to compare";
+    private String statusMessage = tr("Choose two folders to compare");
     private boolean busy;
     private double fraction = -1;
 
@@ -87,17 +89,17 @@ public final class FolderTab extends JPanel implements AppTab {
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(0, 4, 0, 4);
         c.fill = GridBagConstraints.HORIZONTAL;
-        addField(bar, c, 0, "Baseline folder", leftField, true);
-        addField(bar, c, 3, "Candidate folder", rightField, false);
+        addField(bar, c, 0, tr("Baseline folder"), leftField, true);
+        addField(bar, c, 3, tr("Candidate folder"), rightField, false);
         c.gridx = 6;
         c.weightx = 0;
-        bar.add(new JLabel("Files"), c);
+        bar.add(new JLabel(tr("Files")), c);
         c.gridx = 7;
         include.setText("*");
-        include.setToolTipText("Glob for the files to compare, e.g. *.log; separate several with commas");
+        include.setToolTipText(tr("Glob for the files to compare, e.g. *.log; separate several with commas"));
         bar.add(include, c);
         c.gridx = 8;
-        JButton compare = new JButton("Compare");
+        JButton compare = new JButton(tr("Compare"));
         compare.addActionListener(_ -> compare());
         bar.add(compare, c);
 
@@ -166,10 +168,10 @@ public final class FolderTab extends JPanel implements AppTab {
         c.gridx = x + 2;
         c.weightx = 0;
         JButton browse = new JButton(io.github.logdelta.gui.util.Icons.open());
-        browse.setToolTipText("Choose the " + label.toLowerCase(Locale.ROOT));
+        browse.setToolTipText(tr("Choose the folder: {0}", label));
         browse.setFocusable(false);
         browse.addActionListener(_ -> {
-            JFileChooser ch = host.chooser("Choose the " + label.toLowerCase(Locale.ROOT));
+            JFileChooser ch = host.chooser(tr("Choose the folder: {0}", label));
             ch.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             ch.resetChoosableFileFilters();
             if (ch.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
@@ -192,6 +194,11 @@ public final class FolderTab extends JPanel implements AppTab {
         compare();
     }
 
+    /// The folders in the fields as `{baseline, candidate}` text (possibly empty).
+    public String[] folders() {
+        return new String[] {leftField.getText().strip(), rightField.getText().strip()};
+    }
+
     /// Compares the folders in the fields.
     public void compare() {
         Path left;
@@ -200,11 +207,11 @@ public final class FolderTab extends JPanel implements AppTab {
             left = Path.of(leftField.getText().strip());
             right = Path.of(rightField.getText().strip());
         } catch (RuntimeException e) {
-            JOptionPane.showMessageDialog(this, e.getMessage(), "Compare folders", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, e.getMessage(), tr("Compare folders"), JOptionPane.ERROR_MESSAGE);
             return;
         }
         if (!Files.isDirectory(left) || !Files.isDirectory(right)) {
-            JOptionPane.showMessageDialog(this, "Choose two existing folders.", "Compare folders",
+            JOptionPane.showMessageDialog(this, tr("Choose two existing folders."), tr("Compare folders"),
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
@@ -214,7 +221,7 @@ public final class FolderTab extends JPanel implements AppTab {
         running = new Worker(left, right, FolderOptions.DEFAULT.withInclude(globs));
         busy = true;
         fraction = 0;
-        statusMessage = "Comparing folders";
+        statusMessage = tr("Comparing folders");
         host.tabChanged(this);
         running.execute();
     }
@@ -226,7 +233,7 @@ public final class FolderTab extends JPanel implements AppTab {
         }
         if (e.left() == null || e.right() == null) {
             JOptionPane.showMessageDialog(this, e.name() + " exists only in the "
-                    + (e.left() == null ? "candidate" : "baseline") + " folder.", "Open comparison",
+                    + (e.left() == null ? "candidate" : "baseline") + " folder.", tr("Open comparison"),
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
@@ -278,8 +285,11 @@ public final class FolderTab extends JPanel implements AppTab {
     public void copySummary() {
         if (result != null) {
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
-                    new StringSelection(FolderReports.render(result, ReportFormat.MARKDOWN)), null);
-            statusMessage = "Markdown summary copied to clipboard";
+                    new StringSelection(FolderReports.render(result.redacted(host.settings().redactExports()
+                            ? options.redactor()
+                            : io.github.logdelta.core.redact.Redactor.none().withPatterns(options.redactPatterns())),
+                            ReportFormat.MARKDOWN)), null);
+            statusMessage = tr("Markdown summary copied to clipboard");
             host.tabChanged(this);
         }
     }
@@ -295,7 +305,7 @@ public final class FolderTab extends JPanel implements AppTab {
     public String title() {
         String l = name(leftField.getText());
         String r = name(rightField.getText());
-        return l.isEmpty() && r.isEmpty() ? "Folders" : l + "/ ↔ " + r + "/";
+        return l.isEmpty() && r.isEmpty() ? tr("Folders") : l + "/ ↔ " + r + "/";
     }
 
     private static String name(String path) {
@@ -330,7 +340,7 @@ public final class FolderTab extends JPanel implements AppTab {
 
     @Override
     public String busyStage() {
-        return "Comparing folders";
+        return tr("Comparing folders");
     }
 
     @Override
@@ -390,23 +400,23 @@ public final class FolderTab extends JPanel implements AppTab {
             try {
                 result = get();
                 model.fireTableDataChanged();
-                summary.setText(String.format(Locale.ROOT,
-                        "%d file(s): %d changed, %d identical, %d only in baseline, %d only in candidate"
-                                + "  ·  %d new problem(s)", result.entries().size(),
+                summary.setText(tr("{0} file(s): {1} changed, {2} identical, {3} only in baseline, {4} only in "
+                                + "candidate  ·  {5} new problem(s)", result.entries().size(),
                         result.count(FolderEntry.Status.CHANGED), result.count(FolderEntry.Status.IDENTICAL),
                         result.count(FolderEntry.Status.ONLY_LEFT), result.count(FolderEntry.Status.ONLY_RIGHT),
                         result.newProblems()));
-                statusMessage = result.identical() ? "The folders match" : result.newProblems()
-                        + " new problem(s) in " + result.count(FolderEntry.Status.CHANGED) + " changed file(s)";
+                statusMessage = result.identical() ? tr("The folders match")
+                        : tr("{0} new problem(s) in {1} changed file(s)", result.newProblems(),
+                        result.count(FolderEntry.Status.CHANGED));
                 if (!result.entries().isEmpty()) {
                     table.setRowSelectionInterval(0, 0);
                 }
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
-                statusMessage = "Cancelled";
+                statusMessage = tr("Cancelled");
             } catch (ExecutionException e) {
-                statusMessage = e.getCause() instanceof CancelledException ? "Cancelled"
-                        : "Cannot compare folders: " + e.getCause().getMessage();
+                statusMessage = e.getCause() instanceof CancelledException ? tr("Cancelled")
+                        : tr("Cannot compare folders: {0}", e.getCause().getMessage());
             }
             host.tabChanged(FolderTab.this);
         }
@@ -429,7 +439,7 @@ public final class FolderTab extends JPanel implements AppTab {
 
         @Override
         public String getColumnName(int c) {
-            return COLUMNS[c];
+            return tr(COLUMNS[c]);
         }
 
         @Override
@@ -454,7 +464,7 @@ public final class FolderTab extends JPanel implements AppTab {
             if (sel || result == null) {
                 return this;
             }
-            DiffPalette p = host.theme().palette();
+            DiffPalette p = host.palette();
             FolderEntry e = result.entries().get(r);
             Color fg = t.getForeground();
             if (c == 0) {

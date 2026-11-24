@@ -20,6 +20,8 @@ import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// A narrow strip next to the scroll bar that shows where all changes are, so the shape of a
 /// comparison is visible at a glance. Clicking or dragging jumps to that position.
 ///
@@ -39,7 +41,7 @@ public final class OverviewRuler extends JComponent {
     public OverviewRuler(JScrollPane scrollPane) {
         this.scrollPane = scrollPane;
         setPreferredSize(new Dimension(WIDTH, 100));
-        setToolTipText("Overview of all changes — click to jump");
+        setToolTipText(tr("Overview of all changes — click to jump"));
         scrollPane.getViewport().addChangeListener(_ -> repaint());
         MouseAdapter jump = new MouseAdapter() {
             @Override

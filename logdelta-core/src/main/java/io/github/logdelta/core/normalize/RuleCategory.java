@@ -14,6 +14,7 @@ public enum RuleCategory {
     MEMORY("Memory"),
     METRIC("Metrics"),
     PATH("Paths"),
+    FORMAT("Log formats"),
     CUSTOM("Custom");
 
     private final String displayName;

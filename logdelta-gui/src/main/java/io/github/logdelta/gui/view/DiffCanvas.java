@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Paints the side-by-side comparison.
 ///
 /// The component is as tall as all visual rows and exactly as wide as its viewport; horizontal
@@ -565,6 +567,12 @@ public final class DiffCanvas extends JComponent implements Scrollable {
         repaint(rowBounds(v));
         scrollRectToVisible(rowBounds(v));
         listeners.forEach(l -> l.selectionChanged(v));
+        if (accessibleContext != null) {
+            String description = describeRow(v);
+            accessibleContext.firePropertyChange(javax.accessibility.AccessibleContext.ACCESSIBLE_DESCRIPTION_PROPERTY,
+                    null, description);
+            accessibleContext.setAccessibleDescription(description);
+        }
     }
 
     /// Selects a view row and scrolls so that it appears about a third from the top.
@@ -979,12 +987,75 @@ public final class DiffCanvas extends JComponent implements Scrollable {
         return s.indexOf('\t') < 0 ? s.length() : columns(s)[s.length()];
     }
 
+    // --- accessibility -------------------------------------------------------------------------
+
+    @Override
+    public javax.accessibility.AccessibleContext getAccessibleContext() {
+        if (accessibleContext == null) {
+            accessibleContext = new AccessibleJComponent() {
+                @Override
+                public javax.accessibility.AccessibleRole getAccessibleRole() {
+                    return javax.accessibility.AccessibleRole.LIST;
+                }
+
+                @Override
+                public String getAccessibleName() {
+                    return tr("Comparison of the baseline and the candidate");
+                }
+
+                @Override
+                public String getAccessibleDescription() {
+                    return selected < 0 ? tr("Use the arrow keys to move through the rows.") : describeRow(selected);
+                }
+            };
+        }
+        return accessibleContext;
+    }
+
+    /// A sentence describing a view row, for screen readers: its kind and both lines.
+    String describeRow(int v) {
+        if (model == null || v < 0 || v >= model.size()) {
+            return "";
+        }
+        if (!(model.get(v) instanceof ViewRow.Line)) {
+            return tr("Collapsed unchanged lines");
+        }
+        DiffResult result = model.result();
+        DiffRow row = model.diffRow(v);
+        String kind = switch (row.kind()) {
+            case UNCHANGED -> tr("Unchanged");
+            case MODIFIED -> tr("Modified");
+            case REMOVED -> row.isMoved() ? tr("Moved") : tr("Removed");
+            case ADDED -> row.isMoved() ? tr("Moved") : tr("Added");
+        };
+        StringBuilder sb = new StringBuilder(tr("Row {0} of {1}", v + 1, model.size())).append(", ").append(kind);
+        if (row.expected()) {
+            sb.append(", ").append(tr("Normal variation"));
+        }
+        ProcessedLine l = result.left(row);
+        ProcessedLine r = result.right(row);
+        if (l != null) {
+            sb.append(". ").append(tr("Baseline line {0}", l.number())).append(": ").append(l.text());
+        }
+        if (r != null && (l == null || row.kind() != RowKind.UNCHANGED)) {
+            sb.append(". ").append(tr("Candidate line {0}", r.number())).append(": ").append(r.text());
+        }
+        var changes = result.fieldChanges(row);
+        if (!changes.isEmpty()) {
+            sb.append(". ").append(tr("Changed fields")).append(": ");
+            for (int i = 0; i < changes.size() && i < 5; i++) {
+                sb.append(i == 0 ? "" : "; ").append(changes.get(i).describe());
+            }
+        }
+        return sb.toString();
+    }
+
     // --- tooltips ------------------------------------------------------------------------------
 
     @Override
     public String getToolTipText(MouseEvent e) {
         if (onDivider(e.getX())) {
-            return "Drag to resize the panes · double-click for equal widths";
+            return tr("Drag to resize the panes · double-click for equal widths");
         }
         int v = rowAt(e.getY());
         if (v < 0 || !(model.get(v) instanceof ViewRow.Line)) {
@@ -998,11 +1069,13 @@ public final class DiffCanvas extends JComponent implements Scrollable {
         if (!left && e.getX() < x0 + 4 && result.timing().available()) {
             PhaseChange p = result.timing().slowPhaseAt(model.get(v).firstRow());
             if (p != null) {
-                return String.format(Locale.ROOT, "<html><b>Slower phase</b>: %s here, %s in the baseline "
-                                + "(%.1f×)<br>from <code>%s</code><br>to <code>%s</code></html>",
-                        Timeline.format(p.rightMillis()), Timeline.format(p.leftMillis()), p.factor(),
-                        escape(io.github.logdelta.core.util.Text.truncate(p.startText().strip(), 90)),
-                        escape(io.github.logdelta.core.util.Text.truncate(p.endText().strip(), 90)));
+                return "<html>" + tr("<b>Slower phase</b>: {0} here, {1} in the baseline ({2}×)",
+                        Timeline.format(p.rightMillis()), Timeline.format(p.leftMillis()),
+                        String.format(Locale.ROOT, "%.1f", p.factor())) + "<br>" + tr("from") + " <code>"
+                        + escape(io.github.logdelta.core.util.Text.truncate(p.startText().strip(), 90))
+                        + "</code><br>" + tr("to") + " <code>"
+                        + escape(io.github.logdelta.core.util.Text.truncate(p.endText().strip(), 90))
+                        + "</code></html>";
             }
         }
         if (line == null) {
@@ -1012,26 +1085,27 @@ public final class DiffCanvas extends JComponent implements Scrollable {
         if (e.getX() < x0 + gutter) {
             String note = bookmarks.note(left, line.number());
             if (note != null) {
-                return note.isBlank() ? "Bookmark · double-click to remove"
-                        : "<html><b>Bookmark</b><br>" + escape(note).replace("\n", "<br>") + "</html>";
+                return note.isBlank() ? tr("Bookmark · double-click to remove")
+                        : "<html><b>" + tr("Bookmark") + "</b><br>" + escape(note).replace("\n", "<br>") + "</html>";
             }
-            return "Double-click to bookmark this line";
+            return tr("Double-click to bookmark this line");
         }
         int markerX = x0 + gutter;
         if (e.getX() >= markerX && e.getX() < markerX + markerWidth()) {
             if (row.isMoved()) {
                 DiffRow peer = result.rows().get(row.movedPeer());
                 ProcessedLine other = peer.hasLeft() ? result.left(peer) : result.right(peer);
-                return (row.kind() == RowKind.REMOVED ? "Moved to candidate line " : "Moved from baseline line ")
-                        + other.number();
+                return row.kind() == RowKind.REMOVED ? tr("Moved to candidate line {0}", other.number())
+                        : tr("Moved from baseline line {0}", other.number());
             }
             if (row.expected()) {
-                return "Normal variation: another baseline run differs in the same way";
+                return tr("Normal variation: another baseline run differs in the same way");
             }
         }
         if (normalized) {
             return null;
         }
+        String fields = fieldChanges(result, row);
         int textX = markerX + markerWidth() + PAD - hOffset;
         int col = (e.getX() - textX) / charWidth;
         if (wrap) {
@@ -1042,14 +1116,34 @@ public final class DiffCanvas extends JComponent implements Scrollable {
         int[] cols = columns(line.text());
         for (Mask m : line.masks()) {
             if (col >= cols[m.start()] && col < cols[m.end()]) {
+                if (m.ruleId().equals(io.github.logdelta.core.structured.StructuredLines.IGNORED_FIELD_RULE)) {
+                    return "<html><b>" + tr("Ignored field") + "</b><br>" + tr("Fields left out of the comparison "
+                            + "are set in the Rules tab (Log format).") + "</html>";
+                }
                 Rule rule = result.options().rules().find(m.ruleId());
                 String name = rule == null ? m.ruleId() : rule.name();
-                return "<html><b>" + escape(name) + "</b> masked <code>"
-                        + escape(line.text().substring(m.start(), m.end())) + "</code> as <code>"
-                        + escape(m.replacement()) + "</code></html>";
+                return "<html>" + tr("<b>{0}</b> masked {1} as {2}", escape(name), "<code>"
+                        + escape(line.text().substring(m.start(), m.end())) + "</code>", "<code>"
+                        + escape(m.replacement()) + "</code>") + "</html>";
             }
         }
-        return null;
+        return fields;
+    }
+
+    /// For a modified row of structured lines: the fields that changed, as tooltip HTML.
+    private static String fieldChanges(DiffResult result, DiffRow row) {
+        if (row.kind() != RowKind.MODIFIED) {
+            return null;
+        }
+        var changes = result.fieldChanges(row);
+        if (changes.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder("<html><b>").append(tr("Changed fields")).append("</b>");
+        for (int i = 0; i < changes.size() && i < 12; i++) {
+            sb.append("<br>").append(escape(io.github.logdelta.core.util.Text.truncate(changes.get(i).describe(), 160)));
+        }
+        return sb.append("</html>").toString();
     }
 
     private static String escape(String s) {

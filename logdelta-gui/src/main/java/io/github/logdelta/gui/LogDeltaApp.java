@@ -4,6 +4,7 @@
 package io.github.logdelta.gui;
 
 import io.github.logdelta.core.Version;
+import io.github.logdelta.gui.i18n.I18n;
 import io.github.logdelta.gui.settings.AppSettings;
 
 import javax.swing.SwingUtilities;
@@ -18,7 +19,12 @@ import java.util.List;
 /// ```
 ///
 /// Inputs may be files or `http(s)` URLs; with more than two, all but the last are extra
-/// baselines.
+/// baselines. Without arguments, the tabs open at the last exit are reopened (unless that is
+/// turned off).
+///
+/// `--smoke-test` starts the application with throw-away settings, opens the example,
+/// exercises the main features and exits with status 0, or 1 if anything failed; CI runs it
+/// under a virtual display.
 public final class LogDeltaApp {
 
     private LogDeltaApp() {
@@ -29,6 +35,10 @@ public final class LogDeltaApp {
     ///
     /// @param args optional logs, folders or a session file
     public static void main(String[] args) {
+        if (args.length == 1 && args[0].equals("--smoke-test")) {
+            SmokeTest.run();
+            return;
+        }
         if (GraphicsEnvironment.isHeadless()) {
             System.err.println(Version.NAME + ": no display available. Use the command line instead, e.g.\n"
                     + "  logdelta baseline.log candidate.log");
@@ -39,14 +49,16 @@ public final class LogDeltaApp {
         System.setProperty("apple.awt.application.name", Version.NAME);
         SwingUtilities.invokeLater(() -> {
             AppSettings settings = AppSettings.load();
+            I18n.setLanguage(settings.language());
             settings.theme().install();
             MainFrame frame = new MainFrame(settings);
             frame.setVisible(true);
             if (args.length > 0) {
                 frame.openArguments(List.of(args));
-            } else {
+            } else if (!frame.restoreOpenTabs()) {
                 frame.maybeShowTour();
             }
+            frame.maybeCheckForUpdates();
             // macOS delivers files opened from Finder (e.g. a double-clicked .ldsession) here.
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_OPEN_FILE)) {
                 Desktop.getDesktop().setOpenFileHandler(e -> SwingUtilities.invokeLater(() ->

@@ -82,6 +82,43 @@ public record DiffPalette(Color background, Color text, Color lineNumber, Color 
             new Syntax(rgb(0x56B6C2), rgb(0x7D828A), rgb(0xC0A2F7), rgb(0xF47067), rgb(0xF0A35E),
                     rgb(0x7EC699), rgb(0x7D828A), rgb(0x7D828A)));
 
+    /// Light palette for colour vision deficiencies: removals in vermillion and additions in blue
+    /// (Okabe-Ito colours), which stay distinct with red-green colour blindness.
+    public static final DiffPalette LIGHT_CVD = new DiffPalette(
+            rgb(0xFFFFFF), rgb(0x1F2328), rgb(0x8C959F), rgb(0xF6F8FA), rgb(0xD8DEE4),
+            rgb(0xFFE8D6), rgb(0xF5B98A), rgb(0xD55E00),
+            rgb(0xDCEEFF), rgb(0x9ECBF5), rgb(0x0072B2), rgb(0xAA4499),
+            rgb(0xE6F5F2), rgb(0x2E8B7A), rgb(0xF6F8FA), rgb(0xE8ECF0),
+            rgb(0xF0F3F6), rgb(0x57606A), rgb(0x6E7781), rgb(0xAFB8C1),
+            rgb(0xEDE7F6), rgb(0x7E57C2), rgb(0xFFF1A8), rgb(0xFFC93D),
+            rgb(0xD55E00), rgb(0xB8860B), rgb(0xCC6677),
+            new Syntax(rgb(0x0072B2), rgb(0x8C959F), rgb(0x6639BA), rgb(0xD55E00), rgb(0x9A6700),
+                    rgb(0x0072B2), rgb(0x8C959F), rgb(0x8C959F)));
+
+    /// Dark palette for colour vision deficiencies (orange and sky blue).
+    public static final DiffPalette DARK_CVD = new DiffPalette(
+            rgb(0x1E1F22), rgb(0xDFE1E5), rgb(0x6F737A), rgb(0x232427), rgb(0x393B40),
+            rgb(0x3D2A1A), rgb(0x7A4416), rgb(0xE69F00),
+            rgb(0x172B3F), rgb(0x1F4E79), rgb(0x56B4E9), rgb(0xCC79A7),
+            rgb(0x1D3330), rgb(0x44AA99), rgb(0x232427), rgb(0x2C2E33),
+            rgb(0x26282C), rgb(0x8B9098), rgb(0x8C9097), rgb(0x5A5E66),
+            rgb(0x2F2A45), rgb(0x9C8AE0), rgb(0x5C4B13), rgb(0x8F6F0E),
+            rgb(0xE69F00), rgb(0xF0E442), rgb(0xCC6677),
+            new Syntax(rgb(0x56B4E9), rgb(0x7D828A), rgb(0xC0A2F7), rgb(0xE69F00), rgb(0xF0E442),
+                    rgb(0x56B4E9), rgb(0x7D828A), rgb(0x7D828A)));
+
+    /// Maximum contrast: white text on black, saturated markers, yellow focus.
+    public static final DiffPalette HIGH_CONTRAST = new DiffPalette(
+            rgb(0x000000), rgb(0xFFFFFF), rgb(0xD0D0D0), rgb(0x000000), rgb(0xFFFFFF),
+            rgb(0x3A0000), rgb(0xA00000), rgb(0xFF5050),
+            rgb(0x002E0C), rgb(0x00702A), rgb(0x50FF80), rgb(0xFFFF00),
+            rgb(0x1A0040), rgb(0xC080FF), rgb(0x000000), rgb(0x404040),
+            rgb(0x141414), rgb(0xFFFFFF), rgb(0x00FFFF), rgb(0x00FFFF),
+            rgb(0x00007A), rgb(0xFFFF00), rgb(0x5A4A00), rgb(0x8A6D00),
+            rgb(0xFF5050), rgb(0xFFFF00), rgb(0xFF9900),
+            new Syntax(rgb(0x00FFFF), rgb(0xD0D0D0), rgb(0xFF80FF), rgb(0xFF6060), rgb(0xFFD000),
+                    rgb(0x60FF80), rgb(0xD0D0D0), rgb(0xD0D0D0)));
+
     private static Color rgb(int v) {
         return new Color(v);
     }

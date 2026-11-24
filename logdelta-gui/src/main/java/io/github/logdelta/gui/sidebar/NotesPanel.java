@@ -28,6 +28,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Sidebar tab for the reviewer's own annotations: free-form notes about the comparison and the
 /// list of bookmarked lines. Both are saved with the session (`File > Save Session`).
 public final class NotesPanel extends JPanel {
@@ -50,7 +52,7 @@ public final class NotesPanel extends JPanel {
     private final DefaultListModel<Bookmark> model = new DefaultListModel<>();
     private final JList<Bookmark> list = new JList<>(model);
     private final JTextArea notes = new JTextArea(6, 20);
-    private final JLabel caption = Section.caption("Bookmarks");
+    private final JLabel caption = Section.caption(tr("Bookmarks"));
     private DiffPalette palette = DiffPalette.LIGHT;
     private boolean updating;
 
@@ -106,13 +108,13 @@ public final class NotesPanel extends JPanel {
             }
         });
 
-        JButton edit = new JButton("Edit note…");
+        JButton edit = new JButton(tr("Edit note…"));
         edit.addActionListener(_ -> {
             if (list.getSelectedValue() != null) {
                 listener.edit(list.getSelectedValue());
             }
         });
-        JButton remove = new JButton("Remove");
+        JButton remove = new JButton(tr("Remove"));
         remove.addActionListener(_ -> {
             if (list.getSelectedValue() != null) {
                 listener.remove(list.getSelectedValue());
@@ -123,7 +125,7 @@ public final class NotesPanel extends JPanel {
         buttons.add(remove);
 
         JPanel top = new JPanel(new BorderLayout());
-        JLabel notesCaption = Section.caption("Notes");
+        JLabel notesCaption = Section.caption(tr("Notes"));
         notesCaption.setBorder(BorderFactory.createEmptyBorder(10, 12, 6, 12));
         top.add(notesCaption, BorderLayout.NORTH);
         top.add(new JScrollPane(notes), BorderLayout.CENTER);
@@ -134,7 +136,7 @@ public final class NotesPanel extends JPanel {
         JScrollPane scroll = new JScrollPane(list);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         bottom.add(scroll, BorderLayout.CENTER);
-        JLabel hint = new JLabel("<html>Ctrl+B or double-click a line number to bookmark it.</html>");
+        JLabel hint = new JLabel(tr("<html>Ctrl+B or double-click a line number to bookmark it.</html>"));
         hint.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 12));
         hint.setForeground(Section.muted());
         JPanel south = new JPanel(new BorderLayout());
@@ -168,7 +170,7 @@ public final class NotesPanel extends JPanel {
                     }
                 }
             }
-            caption.setText("Bookmarks  (" + bookmarks.size() + ")");
+            caption.setText(tr("Bookmarks") + "  (" + bookmarks.size() + ")");
         } finally {
             updating = false;
         }
@@ -202,7 +204,7 @@ public final class NotesPanel extends JPanel {
         @Override
         public Component getListCellRendererComponent(JList<? extends Bookmark> l, Bookmark b, int index,
                                                       boolean selected, boolean focus) {
-            head.setText((b.side() == Bookmark.Side.LEFT ? "Baseline" : "Candidate") + " line " + b.line());
+            head.setText(b.side() == Bookmark.Side.LEFT ? tr("Baseline line {0}", b.line()) : tr("Candidate line {0}", b.line()));
             String text = b.note().isBlank() ? b.text() : b.note().replace('\n', ' ');
             body.setText(Text.truncate(text.strip(), 90));
             body.setFont(b.note().isBlank() ? l.getFont().deriveFont(Font.ITALIC) : l.getFont());

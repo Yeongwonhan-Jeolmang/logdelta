@@ -4,10 +4,13 @@
 package io.github.logdelta.cli.render;
 
 import io.github.logdelta.core.Version;
+import io.github.logdelta.core.analysis.FlakyLine;
 import io.github.logdelta.core.analysis.FrequencyShift;
 import io.github.logdelta.core.analysis.InsightItem;
 import io.github.logdelta.core.analysis.Insights;
+import io.github.logdelta.core.analysis.ProblemTimeline;
 import io.github.logdelta.core.analysis.Severity;
+import io.github.logdelta.core.analysis.TemplateShift;
 import io.github.logdelta.core.engine.DiffResult;
 import io.github.logdelta.core.model.DiffRow;
 import io.github.logdelta.core.model.DiffStats;
@@ -49,6 +52,15 @@ public final class SummaryRenderer {
             out.println(ansi.dim("  also compared with " + r.extraBaselines().size() + " more baseline run(s); "
                     + s.expected() + " difference(s) they explain count as normal"));
         }
+        String detected = r.detection().describe();
+        if (!detected.isEmpty()) {
+            out.println(ansi.dim("  format: " + detected));
+        }
+        if (r.options().timeWindow() != null) {
+            out.println(ansi.dim("  time window: " + r.options().timeWindow().describe()
+                    + String.format(Locale.ROOT, " (from line %,d / %,d)", r.leftFile().firstLineNumber(),
+                    r.rightFile().firstLineNumber())));
+        }
         out.println();
         if (s.identical()) {
             out.println("  " + ansi.green("Identical after normalization")
@@ -79,11 +91,77 @@ public final class SummaryRenderer {
                 ansi.dim("Warnings ") + compare(in.leftCount(Severity.WARN), in.rightCount(Severity.WARN)));
         out.println();
 
+        problemTimeline(out, r.problemTimeline());
         items(out, "New problems", in.newProblems(), true);
         items(out, "Resolved problems", in.resolvedProblems(), false);
         shifts(out, in.frequencyShifts());
+        templates(out, in.templateShifts());
         timing(out, r.timing());
+        flaky(out, in.flakyLines());
         suggestions(out, r.suggestions());
+    }
+
+    private void problemTimeline(PrintStream out, ProblemTimeline t) {
+        if (t == null || !t.hasProblems()) {
+            return;
+        }
+        String axis = t.byTime() ? "over " + Timeline.format(t.spanMillis()) : "over the file";
+        out.println(ansi.bold("Warnings and errors") + " " + ansi.dim("(" + axis + ")"));
+        int peak = Math.max(1, t.peak());
+        out.println("  " + ansi.dim("baseline  ") + spark(t.left(), peak));
+        out.println("  " + ansi.dim("candidate ") + spark(t.right(), peak));
+        out.println();
+    }
+
+    private String spark(ProblemTimeline.Side side, int peak) {
+        String chars = glyphs.sparks();
+        int levels = chars.length() - 1;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < side.warnings().length; i++) {
+            int n = side.warnings()[i] + side.errors()[i];
+            int level = n == 0 ? 0 : Math.max(1, (int) Math.round(n * (double) levels / peak));
+            String c = String.valueOf(chars.charAt(level));
+            sb.append(side.errors()[i] > 0 ? ansi.red(c) : n > 0 ? ansi.yellow(c) : c);
+        }
+        return sb + ansi.dim(String.format(Locale.ROOT, "  %d errors, %d warnings", side.totalErrors(),
+                side.totalWarnings()));
+    }
+
+    private void templates(PrintStream out, List<TemplateShift> shifts) {
+        if (shifts.isEmpty()) {
+            return;
+        }
+        out.println(ansi.bold("Message templates") + " " + ansi.dim("(similar messages counted together)"));
+        for (TemplateShift t : shifts) {
+            String delta = String.format(Locale.ROOT, "%+5d", t.delta());
+            delta = t.delta() > 0 ? ansi.red(delta) : ansi.green(delta);
+            String counts = String.format(Locale.ROOT, "%4d %s %-4d", t.leftCount(), glyphs.arrow(), t.rightCount());
+            out.println("  " + delta + "  " + ansi.dim(counts) + "  " + truncate(t.template(), Math.max(20, width - 24)));
+        }
+        out.println();
+    }
+
+    private void flaky(PrintStream out, List<FlakyLine> lines) {
+        if (lines.isEmpty()) {
+            return;
+        }
+        out.println(ansi.bold("Flaky lines") + " " + ansi.dim("(differ between the good runs)"));
+        for (FlakyLine f : lines) {
+            out.println("  " + ansi.dim(String.format(Locale.ROOT, "L%-6d", f.lineNumber())) + " "
+                    + truncate(LogText.message(f.text()), Math.max(20, width - 12)));
+            StringBuilder fix = new StringBuilder();
+            for (var rule : f.rules()) {
+                fix.append(fix.isEmpty() ? "" : " ").append("--mask '").append(rule.regex().replace("'", "'\\''"))
+                        .append("=>").append(rule.replacement()).append("'");
+            }
+            if (fix.isEmpty() && f.ignorePattern() != null) {
+                fix.append("-I '").append(f.ignorePattern().replace("'", "'\\''")).append("'");
+            }
+            String similar = f.similarLines() > 0 ? ", +" + f.similarLines() + " similar line(s)" : "";
+            out.println("          " + ansi.dim(f.kind().description() + " (" + f.varyingRuns() + " of "
+                    + (f.totalRuns() - 1) + " other runs" + similar + ")" + (fix.isEmpty() ? "" : "  " + fix)));
+        }
+        out.println();
     }
 
     private void timing(PrintStream out, TimingAnalysis t) {
@@ -159,8 +237,11 @@ public final class SummaryRenderer {
             String sev = String.format(Locale.ROOT, "%-5s", i.severity().label());
             sev = i.severity().compareTo(Severity.ERROR) >= 0 ? ansi.red(sev) : ansi.yellow(sev);
             String more = i.lines() > 1 ? ansi.dim(" (+" + (i.lines() - 1) + " lines)") : "";
+            if (i.repeated()) {
+                more += ansi.bold(" " + (glyphs == Glyphs.UNICODE ? "\u00d7" : "x") + i.occurrences());
+            }
             String loc = String.format(Locale.ROOT, "L%-6d", i.lineNumber());
-            int room = width - 2 - 5 - 1 - loc.length() - 1 - (i.lines() > 1 ? 14 : 0);
+            int room = width - 2 - 5 - 1 - loc.length() - 1 - (i.lines() > 1 ? 14 : 0) - (i.repeated() ? 7 : 0);
             String text = truncate(LogText.message(i.text()), Math.max(20, room));
             out.println("  " + (bad ? sev : ansi.green(String.format(Locale.ROOT, "%-5s", i.severity().label())))
                     + " " + ansi.dim(loc) + " " + text + more);

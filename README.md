@@ -2,6 +2,11 @@
 
 # LogDelta
 
+[![CI](https://github.com/Yeongwonhan-Jeolmang/logdelta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Yeongwonhan-Jeolmang/logdelta/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Yeongwonhan-Jeolmang/logdelta?sort=semver)](https://github.com/Yeongwonhan-Jeolmang/logdelta/releases/latest)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+[![Java 25](https://img.shields.io/badge/Java-25-orange?logo=openjdk)](https://adoptium.net)
+
 **Compare two log files while ignoring what always changes.**
 
 You have a log from a run that worked and a log from a run that broke. A plain `diff` is useless:
@@ -13,8 +18,11 @@ where the two runs **first diverged**.
 
 ![LogDelta comparing two runs of a checkout service](docs/images/main-light.png)
 
-- **Desktop app** (Swing, light and dark themes) with tabs, a side-by-side view, word-level
-  highlights, syntax colouring, filters, bookmarks, live tail and a live rule editor.
+- **Desktop app** (Swing; light, dark and high-contrast themes; English and Korean) with tabs, a
+  side-by-side view, word-level highlights, syntax colouring, filters, bookmarks, live tail, a
+  command palette and a live rule editor.
+- **Understands your logs**: JSON and logfmt are compared field by field, and Spring Boot,
+  nginx/Apache, Kubernetes, journald, logcat and Python logs are recognised automatically.
 - **Command line** with side-by-side, unified, summary, HTML, JSON, Markdown and JUnit output, and
   `logdelta check`, a CI gate that fails only on *new* problems.
 - **GitHub Action** that comments the summary on pull requests.
@@ -60,6 +68,12 @@ where the two runs **first diverged**.
 - **Multi-line entries**: a log line and its stack trace can be compared as one unit.
 - **Folders**: compare every log in two folders, pairing rotated names
   (`app-2026-11-02.log` ↔ `app-2026-11-03.log`).
+- **Structured logs**: JSON lines and logfmt are compared field by field (key order doesn't
+  matter; timestamps and trace ids are ignored), and changed fields are listed.
+- **Presets** for Spring Boot, nginx/Apache access logs, Kubernetes/containerd, journald/syslog,
+  Android logcat and Python logging, detected automatically.
+- **Time windows**: `--since +2m --until +5m` compares the same phase of two runs.
+- **Large files**: memory-mapped reading; two 300 MB logs fit in a 4 GB heap.
 - Reads `.gz` files transparently, downloads `http(s)` URLs, takes pasted text. Detects UTF-8,
   UTF-16 (BOM) and Latin-1.
 
@@ -67,8 +81,12 @@ where the two runs **first diverged**.
 - **New problems**: warnings, errors, exceptions and stack traces that only appear in the
   candidate, grouped (a stack trace is one item, not twenty).
 - **Resolved problems**: errors that disappeared.
-- **Frequency shifts**: messages whose count changed sharply, e.g. `0 → 5`
-  `Payment gateway call failed`.
+- **Frequency shifts** and **message templates**: messages whose count changed sharply, grouped
+  by template, e.g. `0 → 15` `Payment gateway call failed (attempt <*> ...)`.
+- **Problems over time**: a chart (sparkline in the terminal) of warnings and errors along each
+  run.
+- **Flaky lines**: with several good runs, the lines that already vary between them, with the
+  rule that hides them.
 - **First divergence**: where the runs stop matching.
 - **Timing**: run durations and the phases between matching lines that got slower or faster
   (`132 ms → 15.1 s` between "Validating cart" and "Responded 502").
@@ -95,6 +113,11 @@ where the two runs **first diverged**.
 - Open from files, URLs or the clipboard; drag and drop, recent comparisons, zoom,
   light/dark/system themes, a first-run tour.
 - Export to HTML, Markdown, JSON, JUnit XML or unified diff; copy a Markdown summary for a ticket.
+  **Secrets are removed from exports** (passwords, tokens, API keys, e-mail addresses).
+- Command palette (Ctrl+Shift+P), a keyboard shortcut reference, and the previous session's
+  tabs reopened at start.
+- Accessible: colour-blind-safe colours, a high-contrast theme, screen-reader names.
+- Korean translation; an opt-in check for new releases.
 
 **Command line**
 - Side-by-side (colour), unified, summary, HTML, JSON, Markdown and JUnit XML output.
@@ -103,6 +126,9 @@ where the two runs **first diverged**.
 - `check`: compare with known-good baselines, fail only on new problems, keep a rolling folder
   of accepted runs, write JUnit XML and GitHub annotations.
 - `normalize`, `explain` and `rules` sub-commands for building and debugging rules.
+- Reports have secrets redacted by default (`--no-redact`, `--redact REGEX`).
+- A `.logdelta` profile in your repository is picked up automatically.
+- Shell completions for bash, zsh, fish and PowerShell, and a man page.
 
 ## Quick start
 
@@ -113,14 +139,14 @@ To run the jar or build from source you need **Java 25 or newer** (`java -versio
 builds: [Adoptium Temurin](https://adoptium.net) or [Oracle JDK](https://www.oracle.com/java/technologies/downloads/).
 
 ```sh
-# Build (see "Building from source" if you don't have Maven)
-mvn -q package -DskipTests
+# Build (the Maven wrapper downloads Maven if needed)
+./mvnw -q package -DskipTests
 
 # Open the desktop app
-java -jar logdelta-app/target/logdelta-1.1.0.jar
+java -jar logdelta-app/target/logdelta-2.0.0.jar
 
 # ...or compare from the terminal
-java -jar logdelta-app/target/logdelta-1.1.0.jar examples/baseline.log examples/candidate.log
+java -jar logdelta-app/target/logdelta-2.0.0.jar examples/baseline.log examples/candidate.log
 ```
 
 In the app, click **Try the example** to load the bundled logs of a checkout service whose payment
@@ -129,7 +155,7 @@ gateway started timing out. The first start also offers a one-minute tour.
 A shell alias makes the CLI pleasant to use:
 
 ```sh
-alias logdelta='java -jar /path/to/logdelta-1.1.0.jar'
+alias logdelta='java -jar /path/to/logdelta-2.0.0.jar'
 ```
 
 ## Using the desktop app
@@ -171,19 +197,29 @@ LogDelta  baseline.log → candidate.log
   First divergence  baseline line 1, candidate line 1
   Errors            0 → 10  Warnings 0 → 17
 
-New problems (6)
+Warnings and errors (over 1 min 23 s)
+  baseline                                                                0 errors, 0 warnings
+  candidate   ▁    ▁   ▁  █   ▁   ▁   ▂  ▁   ▁   ▃  ▁   ▁   ▂  ▁   ▁   ▂  10 errors, 17 warnings
+
+New problems (2)
   WARN  L10     Flag "loyalty-points" is deprecated and will be removed in 3.0
-  ERROR L45     Payment gateway call failed (attempt 1/3): Read timed out after 5000ms (+8 lines)
-  ...
+  ERROR L45     Payment gateway call failed (attempt 1/3): Read timed out afte… (+8 lines) ×5
 
 Frequency shifts (occurrences baseline → candidate)
      +5     0 → 5     Order ORD-<ID> could not be charged
      +5     0 → 5     Responded 502 for requestId=<UUID> in <DURATION>
-     ...
+
+Message templates (similar messages counted together)
+    +15     0 → 15    Payment gateway call failed (attempt <*> Read timed out after <DURATION>
 
 Timing (run duration 6.55 s → 1 min 23 s)
   114.2x    132 ms → 15.1 s    Validating cart for ORD-653708 with 5 items → Responded 502 for …
     5.8x    411 ms → 2.39 s    Loading price cache... → Warmed price cache with 1204 entries in…
+
+Flaky lines (differ between the good runs)
+  L1      Starting CheckoutService v2.8.3 using Java 25.0.1 with PID 48211
+          changes between runs (1 of 1 other runs)  --mask '(\bPID\s+)\d+(?:\.\d+)?\b=>$1<N>'
+  ...
 
 Suggested rules (would hide run-specific differences)
    14  differ only in the value of `session`
@@ -206,6 +242,12 @@ logdelta check -b expected.log --report junit:out.xml build/app.log   # the CI g
 logdelta explain "2026-11-12 08:49:03 pid=42 took 3ms"   # which rules match?
 logdelta normalize app.log | sort | uniq -c | sort -rn   # top message templates
 logdelta rules --disable epoch --export team.ldprofile    # start a shared profile
+logdelta good.jsonl bad.jsonl                      # JSON/logfmt: compared field by field
+logdelta --ignore-field requestId a.jsonl b.jsonl  # leave a field out
+logdelta --since +2m --until +5m big-1.log big-2.log     # the same phase of two runs
+logdelta --preset logcat a.txt b.txt               # force a format preset (auto by default)
+logdelta -f html --no-redact -o raw.html a.log b.log     # keep secrets in the report
+eval "$(logdelta completion bash)"                 # tab completion (zsh, fish, powershell too)
 ```
 
 The full option reference is in [docs/CLI.md](docs/CLI.md).
@@ -224,7 +266,7 @@ logdelta check --baseline-dir .logdelta/runs --update-on-pass build/app.log   # 
 On GitHub, the action does the same and comments the summary on the pull request:
 
 ```yaml
-- uses: Yeongwonhan-Jeolmang/logdelta@v1.1.0
+- uses: Yeongwonhan-Jeolmang/logdelta@v2.0.0
   with:
     baseline: tests/expected/app.log
     candidate: build/app.log
@@ -264,7 +306,9 @@ pattern = ORD-\d{6}
 replacement = ORD-<ID>
 ```
 
-Use it with `-p team.ldprofile` or **File > Load Profile**. Format: [docs/PROFILES.md](docs/PROFILES.md).
+Use it with `-p team.ldprofile` or **File > Load Profile**. Name it `.logdelta` and put it at
+the root of your repository, and the CLI uses it automatically in every folder below
+(`--no-profile` to skip). Format: [docs/PROFILES.md](docs/PROFILES.md).
 
 ## Reports
 
@@ -276,15 +320,18 @@ Use it with `-p team.ldprofile` or **File > Load Profile**. Format: [docs/PROFIL
 | JUnit XML | CI test views: each new problem is a failing test. |
 | Unified diff | Reading in any diff viewer or code review tool. |
 
-Details and the JSON schema are in [docs/REPORTS.md](docs/REPORTS.md).
+Exported reports have passwords, tokens, API keys, private keys, credentials in URLs and e-mail
+addresses replaced by `[REDACTED]`, so they are safe to attach to a ticket
+(`--no-redact` keeps them). Details and the JSON schema are in [docs/REPORTS.md](docs/REPORTS.md).
 
 ## How it works
 
 ```text
-read (file/URL, gzip/charset) → drop ignored lines → normalize (rules) + parse timestamps
+read (file/URL, gzip/charset, memory-mapped; time window) → detect format and preset
+     → drop ignored lines → parse JSON/logfmt fields → normalize (rules) + parse timestamps
      → intern keys → diff (Myers/Patience, optionally by multi-line entry) → pair modified lines
      → detect moves → mark normal variation (extra baselines) → word-level highlights
-     → insights, timing, rule suggestions → view / report
+     → insights, templates, flaky lines, timing, rule suggestions → view / report (redacted)
 ```
 
 Lines are compared by their **comparison key**: the normalized text, optionally lower-cased and
@@ -300,15 +347,23 @@ runs in parallel, so it scales with CPU cores. Logs of a few thousand lines comp
 a second. The diff itself handles hundreds of thousands of lines in milliseconds when the logs
 are mostly similar; a cost limit keeps very different inputs fast (`--minimal` turns it off).
 
+Files of 32 MB and more are memory-mapped and kept in compact form: two similar 300 MB logs
+(about 3 million lines each) compare in under three minutes with `-Xmx4g`, and with
+`--since`/`--until` covering two minutes of each run in about ten seconds with `-Xmx1g`.
+
 ## Building from source
 
-With Maven 3.9+ and JDK 25+:
+With JDK 25+ (the Maven wrapper downloads Maven 3.9 on first use):
 
 ```sh
-mvn verify                   # compile, run all tests, build the jars
+./mvnw verify                # compile, run all tests, build the jars (mvnw.cmd on Windows)
 ```
 
-The all-in-one jar is `logdelta-app/target/logdelta-1.1.0.jar`. Each module also produces its
+GUI tests that need a display are skipped by default; on Linux run them with
+`xvfb-run -a ./mvnw verify -Dlogdelta.headless=false`, and
+`java -jar dist/logdelta.jar gui --smoke-test` starts the real app and checks it end to end.
+
+The all-in-one jar is `logdelta-app/target/logdelta-2.0.0.jar`. Each module also produces its
 own jar.
 
 Without Maven, only a JDK is needed (tests are not run):

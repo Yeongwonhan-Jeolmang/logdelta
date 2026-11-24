@@ -22,20 +22,48 @@ Besides the desktop app, each installer contains a command-line launcher, `logde
 | macOS | `/Applications/LogDelta.app/Contents/MacOS/logdelta-cli` |
 | Linux | `/opt/logdelta/bin/logdelta-cli` |
 
-Link it into your `PATH` to use it as `logdelta`, for example on Linux:
+The .deb package also installs `/usr/bin/logdelta`, shell completions for bash, zsh and fish,
+and a man page (`man logdelta`). Elsewhere, link the launcher into your `PATH` to use it as
+`logdelta`, for example with the .rpm:
 
 ```sh
 sudo ln -s /opt/logdelta/bin/logdelta-cli /usr/local/bin/logdelta
 ```
+
+### Shell completions and the man page
+
+Every installer contains the completion scripts and the man page (`completions/` and `man/` in
+the installation folder, e.g. `/opt/logdelta/lib/` on Linux and
+`LogDelta.app/Contents/Resources/` on macOS). You can also generate them at any time:
+
+```sh
+logdelta completion bash > ~/.local/share/bash-completion/completions/logdelta
+logdelta completion zsh  > "${fpath[1]}/_logdelta"
+logdelta completion fish > ~/.config/fish/completions/logdelta.fish
+logdelta completion powershell | Out-String | Invoke-Expression   # put this line in $PROFILE
+logdelta manpage > ~/.local/share/man/man1/logdelta.1
+```
+
+### Memory
+
+The installed launchers let Java use up to 75 % of the computer's memory
+(`-XX:MaxRAMPercentage=75`), enough for logs of several hundred megabytes. With the jar, pass
+`-Xmx` yourself, e.g. `java -Xmx4g -jar logdelta-2.0.0.jar big-1.log big-2.log`.
 
 ## The jar
 
 If you have Java 25 or newer, the all-in-one jar runs everywhere:
 
 ```sh
-java -jar logdelta-1.1.0.jar                    # desktop app
-java -jar logdelta-1.1.0.jar a.log b.log        # command line
+java -jar logdelta-2.0.0.jar                    # desktop app
+java -jar logdelta-2.0.0.jar a.log b.log        # command line
 ```
+
+## Updates
+
+The app can check GitHub Releases for a newer version (**Help > Check for Updates**, or
+automatically once a day with **Help > Check Automatically**, off by default). It only reads the
+latest release's version number; it never downloads or installs anything.
 
 ## Building the installers yourself
 

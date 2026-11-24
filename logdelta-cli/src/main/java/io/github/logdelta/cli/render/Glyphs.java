@@ -23,6 +23,11 @@ public record Glyphs(String vertical, String horizontal, String cross, String el
     /// Plain ASCII.
     public static final Glyphs ASCII = new Glyphs("|", "-", "+", ">", "->", "^", "...");
 
+    /// Characters for sparklines, from empty to full.
+    public String sparks() {
+        return this == UNICODE || vertical.equals("│") ? " ▁▂▃▄▅▆▇█" : " .:-=+*#@";
+    }
+
     /// Returns [#UNICODE] or [#ASCII].
     public static Glyphs of(boolean unicode) {
         return unicode ? UNICODE : ASCII;

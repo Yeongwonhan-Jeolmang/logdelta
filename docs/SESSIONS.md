@@ -8,7 +8,7 @@ A session file is a [profile](PROFILES.md) with two extra kinds of section, so e
 profile can hold is part of the session:
 
 ```ini
-# LogDelta session (1.1.0)
+# LogDelta session (2.0.0)
 [session]
 left = logs/good.log
 right = https://ci.example.com/job/812/artifact/app.log

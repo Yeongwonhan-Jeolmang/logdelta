@@ -6,7 +6,7 @@
 
     <groupId>io.github.logdelta</groupId>
     <artifactId>logdelta-parent</artifactId>
-    <version>1.1.0</version>
+    <version>2.0.0</version>
     <packaging>pom</packaging>
 
     <name>LogDelta</name>
@@ -57,6 +57,9 @@
 
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
+        <!-- Desktop tests that need a display are skipped while this is true; CI sets it to false
+             and runs the build under a virtual display (xvfb-run). -->
+        <logdelta.headless>true</logdelta.headless>
         <jar-plugin.version>3.4.2</jar-plugin.version>
         <assembly-plugin.version>3.7.1</assembly-plugin.version>
         <javadoc-plugin.version>3.12.0</javadoc-plugin.version>
@@ -133,7 +136,7 @@
                     <version>${surefire-plugin.version}</version>
                     <configuration>
                         <systemPropertyVariables>
-                            <java.awt.headless>true</java.awt.headless>
+                            <java.awt.headless>${logdelta.headless}</java.awt.headless>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>

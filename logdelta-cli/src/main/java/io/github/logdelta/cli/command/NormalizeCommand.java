@@ -10,10 +10,9 @@ import io.github.logdelta.cli.args.OptionSpec;
 import io.github.logdelta.cli.args.ParsedArgs;
 import io.github.logdelta.cli.args.UsageException;
 import io.github.logdelta.core.engine.DiffOptions;
+import io.github.logdelta.core.engine.LogDeltaEngine;
 import io.github.logdelta.core.io.LogFile;
 import io.github.logdelta.core.io.LogReader;
-import io.github.logdelta.core.normalize.LineFilter;
-import io.github.logdelta.core.normalize.Normalizer;
 
 import java.io.PrintStream;
 import java.nio.file.NoSuchFileException;
@@ -63,8 +62,6 @@ public final class NormalizeCommand implements Command {
             throw new UsageException("Expected exactly one FILE");
         }
         DiffOptions options = OptionSupport.buildOptions(args, ctx);
-        Normalizer normalizer = options.normalizer();
-        LineFilter filter = options.lineFilter();
         String name = args.positionals().get(0);
         LogFile file;
         try {
@@ -76,18 +73,20 @@ public final class NormalizeCommand implements Command {
         }
         PrintStream out = ctx.out();
         boolean numbers = args.has("line-numbers");
-        boolean keep = args.has("keep-ignored");
-        int i = 0;
-        for (String line : file.lines()) {
-            i++;
-            if (!keep && filter.isIgnored(line)) {
-                continue;
-            }
+        if (args.has("keep-ignored")) {
+            options = options.toBuilder().ignorePatterns(java.util.List.of()).build();
+        }
+        // The same preparation as a comparison: time window, format, preset, structured fields.
+        LogDeltaEngine.Prepared prepared = LogDeltaEngine.prepare(file, options);
+        if (prepared.detection().format().isStructured() || prepared.detection().preset() != null) {
+            ctx.err().println("logdelta: format: " + prepared.detection().describe());
+        }
+        for (var line : prepared.lines()) {
             if (numbers) {
-                out.print(i);
+                out.print(line.number());
                 out.print('\t');
             }
-            out.println(normalizer.normalize(line).normalized());
+            out.println(line.normalized());
         }
         out.flush();
         return ExitCode.OK;

@@ -53,7 +53,7 @@ public final class RuleSuggester {
 
     private static final int MAX_ROWS = 5000;
     private static final int MAX_CANDIDATES = 15;
-    private static final Pattern KEY_CONTEXT = Pattern.compile("([A-Za-z_][\\w.-]{0,40})\\s*[=:]\\s*[\"']?$");
+    private static final Pattern KEY_CONTEXT = Pattern.compile("([A-Za-z_][\\w.-]{0,40})\"?\\s*[=:]\\s*[\"']?$");
     private static final Pattern WORD_CONTEXT = Pattern.compile("\\b([A-Za-z]{2,30})\\s+$");
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
     private static final Pattern HEX = Pattern.compile("[0-9a-fA-F]+");
@@ -139,6 +139,59 @@ public final class RuleSuggester {
         return out.size() > MAX_SUGGESTIONS ? List.copyOf(out.subList(0, MAX_SUGGESTIONS)) : List.copyOf(out);
     }
 
+    /// Proposes rules that make two specific lines equal, e.g. a line that differs between two
+    /// good runs. A single rule is preferred; otherwise up to [#MAX_RULES_PER_LINE] rules, one per
+    /// changed value, are combined. Unlike [#suggest], the rules need not resolve several lines.
+    ///
+    /// @param leftText   original text of the first line
+    /// @param left       its normalized text
+    /// @param rightText  original text of the second line
+    /// @param right      its normalized text
+    /// @param takenIds   rule ids already in use; the new ids are added to it
+    /// @return the rules, or an empty list if no combination makes the lines equal
+    public static List<Rule> rulesFor(String leftText, String left, String rightText, String right, RuleSet rules,
+                                      boolean ignoreCase, boolean ignoreWhitespace, Set<String> takenIds) {
+        List<Rule> built = new ArrayList<>();
+        Set<String> local = new HashSet<>(takenIds);
+        Set<String> regexes = new HashSet<>();
+        for (Candidate c : candidatesFor(left, right)) {
+            if (!regexes.add(c.regex)) {
+                continue;
+            }
+            try {
+                built.add(Rule.builder(uniqueId(c.idBase, local)).name(c.name).category(RuleCategory.CUSTOM)
+                        .pattern(c.regex).replacement(c.replacement).description("Varies between good runs: "
+                                + c.summary).build());
+                local.add(built.getLast().id());
+            } catch (InvalidRuleException e) {
+                // skip
+            }
+        }
+        for (Rule rule : built) {
+            Normalizer n = new Normalizer(rules.withAt(0, rule), ignoreCase, ignoreWhitespace);
+            if (n.key(leftText).equals(n.key(rightText))) {
+                takenIds.add(rule.id());
+                return List.of(rule);
+            }
+        }
+        if (built.size() < 2 || built.size() > MAX_RULES_PER_LINE) {
+            return List.of();
+        }
+        RuleSet combined = rules;
+        for (int i = built.size() - 1; i >= 0; i--) {
+            combined = combined.withAt(0, built.get(i));
+        }
+        Normalizer n = new Normalizer(combined, ignoreCase, ignoreWhitespace);
+        if (!n.key(leftText).equals(n.key(rightText))) {
+            return List.of();
+        }
+        built.forEach(r -> takenIds.add(r.id()));
+        return List.copyOf(built);
+    }
+
+    /// Most rules [#rulesFor] combines for one line.
+    public static final int MAX_RULES_PER_LINE = 3;
+
     /// Candidates for one modified line; package-private for tests.
     static List<Candidate> candidatesFor(String l, String r) {
         InlineHighlights h = InlineDiff.compute(l, r);
@@ -171,7 +224,7 @@ public final class RuleSuggester {
         Matcher key = KEY_CONTEXT.matcher(prefix);
         if (key.find()) {
             String k = key.group(1);
-            String regex = "(\\b" + escape(k) + "\\s*[=:]\\s*[\"']?)[^\\s,;\"')\\]}]+";
+            String regex = "(\\b" + escape(k) + "\"?\\s*[=:]\\s*[\"']?)[^\\s,;\"')\\]}]+";
             return new Candidate(regex, "$1<" + placeholder(k) + ">", "mask-" + slug(k),
                     "Value of " + k, "differ only in the value of `" + k + "`");
         }

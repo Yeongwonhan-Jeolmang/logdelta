@@ -25,6 +25,8 @@ import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Find bar shown above the comparison (`Ctrl+F`). Searching starts while typing; Enter and
 /// Shift+Enter step through matches, Escape closes the bar.
 public final class SearchBar extends JPanel {
@@ -74,22 +76,22 @@ public final class SearchBar extends JPanel {
         });
         field.setMaximumSize(new Dimension(420, field.getPreferredSize().height + 4));
         field.putClientProperty("JTextField.placeholderText", "Find in both logs");
-        field.setToolTipText("Find in both logs (Enter: next, Shift+Enter: previous, Esc: close)");
+        field.setToolTipText(tr("Find in both logs (Enter: next, Shift+Enter: previous, Esc: close)"));
         bind(field, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), () -> step(true));
         bind(field, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, KeyEvent.SHIFT_DOWN_MASK),
                 () -> step(false));
         bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
                 this::close);
 
-        regex.setToolTipText("Regular expression");
-        matchCase.setToolTipText("Match case");
+        regex.setToolTipText(tr("Regular expression"));
+        matchCase.setToolTipText(tr("Match case"));
         regex.addActionListener(_ -> fire());
         matchCase.addActionListener(_ -> fire());
 
-        JButton prev = iconButton(Icons.previous(), "Previous match (Shift+Enter)", () -> step(false));
-        JButton next = iconButton(Icons.next(), "Next match (Enter)", () -> step(true));
+        JButton prev = iconButton(Icons.previous(), tr("Previous match (Shift+Enter)"), () -> step(false));
+        JButton next = iconButton(Icons.next(), tr("Next match (Enter)"), () -> step(true));
         JButton close = new JButton("✕");
-        close.setToolTipText("Close (Esc)");
+        close.setToolTipText(tr("Close (Esc)"));
         close.addActionListener(_ -> close());
         close.setFocusable(false);
 

@@ -6,6 +6,7 @@ package io.github.logdelta.gui.sidebar;
 import io.github.logdelta.core.analysis.FrequencyShift;
 import io.github.logdelta.core.analysis.InsightItem;
 import io.github.logdelta.core.analysis.Severity;
+import io.github.logdelta.core.analysis.TemplateShift;
 import io.github.logdelta.core.engine.DiffResult;
 import io.github.logdelta.core.util.LogText;
 import io.github.logdelta.core.util.Text;
@@ -35,19 +36,22 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.Locale;
+import java.util.ArrayList;
 import java.util.function.IntConsumer;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Sidebar tab answering "what went wrong?": problems that only appear in the candidate,
-/// problems that disappeared, and messages whose frequency changed. Selecting an entry jumps to
-/// it in the comparison.
+/// problems that disappeared, and messages (or message templates) whose frequency changed.
+/// Selecting an entry jumps to it in the comparison.
 public final class InsightsPanel extends JPanel {
 
     private final DefaultListModel<InsightItem> newModel = new DefaultListModel<>();
     private final DefaultListModel<InsightItem> resolvedModel = new DefaultListModel<>();
     private final ShiftModel shiftModel = new ShiftModel();
-    private final JLabel newCaption = Section.caption("New problems");
-    private final JLabel resolvedCaption = Section.caption("Resolved problems");
-    private final JLabel shiftCaption = Section.caption("Frequency shifts");
+    private final JLabel newCaption = Section.caption(tr("New problems"));
+    private final JLabel resolvedCaption = Section.caption(tr("Resolved problems"));
+    private final JLabel shiftCaption = Section.caption(tr("Frequency shifts"));
     private DiffPalette palette = DiffPalette.LIGHT;
 
     /// @param goToRow navigates to a diff row
@@ -59,7 +63,13 @@ public final class InsightsPanel extends JPanel {
             @Override
             public String getToolTipText(MouseEvent e) {
                 int r = rowAtPoint(e.getPoint());
-                return r < 0 ? null : shiftModel.shifts.get(r).template();
+                if (r < 0) {
+                    return null;
+                }
+                Shift sh = shiftModel.shifts.get(r);
+                return sh.variants() > 1 ? "<html><b>" + tr("Message template") + "</b> \u00b7 "
+                        + tr("{0} different messages", sh.variants()) + "<br><code>" + Text.escapeHtml(sh.text())
+                        + "</code></html>" : sh.text();
             }
         };
         shifts.setFillsViewportHeight(true);
@@ -67,6 +77,9 @@ public final class InsightsPanel extends JPanel {
         shifts.setRowHeight(shifts.getRowHeight() + 4);
         shifts.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         shifts.getColumnModel().getColumn(0).setPreferredWidth(240);
+        shifts.getAccessibleContext().setAccessibleName(tr("Frequency shifts"));
+        newList.getAccessibleContext().setAccessibleName(tr("New problems"));
+        resolvedList.getAccessibleContext().setAccessibleName(tr("Resolved problems"));
         for (int c = 1; c < 4; c++) {
             shifts.getColumnModel().getColumn(c).setPreferredWidth(44);
             shifts.getColumnModel().getColumn(c).setMaxWidth(70);
@@ -121,11 +134,19 @@ public final class InsightsPanel extends JPanel {
         if (r != null) {
             r.insights().newProblems().forEach(newModel::addElement);
             r.insights().resolvedProblems().forEach(resolvedModel::addElement);
-            shiftModel.set(r.insights().frequencyShifts());
+            List<Shift> all = new ArrayList<>();
+            for (FrequencyShift f : r.insights().frequencyShifts()) {
+                all.add(new Shift(LogText.message(f.template()), f.leftCount(), f.rightCount(), 1, f.firstRow()));
+            }
+            for (TemplateShift t : r.insights().templateShifts()) {
+                all.add(new Shift(t.template(), t.leftCount(), t.rightCount(), t.variants(), t.firstRow()));
+            }
+            all.sort(java.util.Comparator.comparingInt((Shift x) -> -Math.abs(x.right() - x.left())));
+            shiftModel.set(all);
         }
-        newCaption.setText("NEW PROBLEMS  (" + newModel.size() + ")");
-        resolvedCaption.setText("RESOLVED PROBLEMS  (" + resolvedModel.size() + ")");
-        shiftCaption.setText("FREQUENCY SHIFTS  (" + shiftModel.getRowCount() + ")");
+        newCaption.setText(tr("New problems") + "  (" + newModel.size() + ")");
+        resolvedCaption.setText(tr("Resolved problems") + "  (" + resolvedModel.size() + ")");
+        shiftCaption.setText(tr("Frequency shifts") + "  (" + shiftModel.getRowCount() + ")");
     }
 
     private static JPanel block(JLabel caption, JScrollPane body) {
@@ -186,10 +207,15 @@ public final class InsightsPanel extends JPanel {
         public Component getListCellRendererComponent(JList<? extends InsightItem> list, InsightItem item, int index,
                                                       boolean selected, boolean focus) {
             badge.severity = item.severity();
-            line.setText("line " + item.lineNumber() + (item.lines() > 1 ? "  ·  +" + (item.lines() - 1)
-                    + " following lines" : ""));
+            line.setText(tr("line {0}", item.lineNumber()) + (item.lines() > 1 ? "  \u00b7  "
+                    + tr("+{0} following lines", item.lines() - 1) : "")
+                    + (item.repeated() ? "  \u00b7  \u00d7" + item.occurrences() : ""));
+            getAccessibleContext().setAccessibleName(item.severity().label() + ", " + line.getText() + ": "
+                    + LogText.message(item.text()));
             text.setText(Text.truncate(LogText.message(item.text()), 200));
-            setToolTipText(item.text());
+            setToolTipText(item.repeated() ? "<html>" + Text.escapeHtml(item.text()) + "<br><i>"
+                    + tr("{0} occurrences of", item.occurrences()) + "</i> <code>"
+                    + Text.escapeHtml(item.template()) + "</code></html>" : item.text());
             text.setFont(list.getFont());
             Color bg = selected ? list.getSelectionBackground() : list.getBackground();
             Color fg = selected ? list.getSelectionForeground() : list.getForeground();
@@ -227,11 +253,14 @@ public final class InsightsPanel extends JPanel {
         }
     }
 
-    private static final class ShiftModel extends AbstractTableModel {
-        private static final String[] COLUMNS = {"Message (normalized)", "Base", "Cand", "Δ"};
-        private List<FrequencyShift> shifts = List.of();
+    /// One row of the shift table: an exact message or a template.
+    private record Shift(String text, int left, int right, int variants, int firstRow) {
+    }
 
-        void set(List<FrequencyShift> s) {
+    private static final class ShiftModel extends AbstractTableModel {
+        private List<Shift> shifts = List.of();
+
+        void set(List<Shift> s) {
             shifts = s;
             fireTableDataChanged();
         }
@@ -243,22 +272,27 @@ public final class InsightsPanel extends JPanel {
 
         @Override
         public int getColumnCount() {
-            return COLUMNS.length;
+            return 4;
         }
 
         @Override
         public String getColumnName(int c) {
-            return COLUMNS[c];
+            return switch (c) {
+                case 0 -> tr("Message (normalized)");
+                case 1 -> tr("Base");
+                case 2 -> tr("Cand");
+                default -> "\u0394";
+            };
         }
 
         @Override
         public Object getValueAt(int r, int c) {
-            FrequencyShift f = shifts.get(r);
+            Shift f = shifts.get(r);
             return switch (c) {
-                case 0 -> LogText.message(f.template());
-                case 1 -> String.valueOf(f.leftCount());
-                case 2 -> String.valueOf(f.rightCount());
-                default -> String.format(Locale.ROOT, "%+d", f.delta());
+                case 0 -> f.variants() > 1 ? "\u2248 " + f.text() : f.text();
+                case 1 -> String.valueOf(f.left());
+                case 2 -> String.valueOf(f.right());
+                default -> String.format(Locale.ROOT, "%+d", f.right() - f.left());
             };
         }
     }

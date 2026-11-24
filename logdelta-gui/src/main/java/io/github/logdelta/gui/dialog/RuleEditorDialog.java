@@ -53,6 +53,8 @@ import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Modal editor for the rule list: add, duplicate, delete, reorder and edit rules, with a live
 /// tester that shows how sample lines are normalized by the rules being edited.
 ///
@@ -74,11 +76,11 @@ public final class RuleEditorDialog extends JDialog {
     private final JComboBox<RuleCategory> categoryBox = new JComboBox<>(RuleCategory.values());
     private final JTextField patternField = new JTextField();
     private final JTextField replacementField = new JTextField();
-    private final JCheckBox caseBox = new JCheckBox("Ignore case");
-    private final JCheckBox enabledBox = new JCheckBox("Enabled");
+    private final JCheckBox caseBox = new JCheckBox(tr("Ignore case"));
+    private final JCheckBox enabledBox = new JCheckBox(tr("Enabled"));
     private final JTextField descriptionField = new JTextField();
     private final JLabel status = new JLabel(" ");
-    private final JButton restore = new JButton("Restore default");
+    private final JButton restore = new JButton(tr("Restore default"));
     private final JTextArea sample = new JTextArea(4, 60);
     private final JTextPane output = new JTextPane();
     private final DiffPalette palette;
@@ -91,7 +93,7 @@ public final class RuleEditorDialog extends JDialog {
     /// @param sampleText initial tester text, or `null` for a default sample
     /// @param palette    colours used to highlight masks in the tester
     public RuleEditorDialog(Window owner, RuleSet ruleSet, String sampleText, DiffPalette palette) {
-        super(owner, "Normalization rules", ModalityType.APPLICATION_MODAL);
+        super(owner, tr("Normalization rules"), ModalityType.APPLICATION_MODAL);
         this.rules = new ArrayList<>(ruleSet.rules());
         this.palette = palette;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -104,9 +106,9 @@ public final class RuleEditorDialog extends JDialog {
         main.setBorder(null);
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        JButton cancel = new JButton("Cancel");
+        JButton cancel = new JButton(tr("Cancel"));
         cancel.addActionListener(_ -> dispose());
-        JButton ok = new JButton("OK");
+        JButton ok = new JButton(tr("OK"));
         ok.addActionListener(_ -> {
             result = RuleSet.of(rules);
             dispose();
@@ -163,13 +165,13 @@ public final class RuleEditorDialog extends JDialog {
         });
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 6));
-        actions.add(button("New", "Add a custom rule", this::addRule));
-        actions.add(button("Duplicate", "Copy the selected rule", this::duplicateRule));
-        actions.add(button("Delete", "Remove the selected rule", this::deleteRule));
-        actions.add(button("↑", "Move up: rules run from top to bottom", () -> move(-1)));
-        actions.add(button("↓", "Move down", () -> move(1)));
+        actions.add(button(tr("New"), tr("Add a custom rule"), this::addRule));
+        actions.add(button(tr("Duplicate"), tr("Copy the selected rule"), this::duplicateRule));
+        actions.add(button(tr("Delete"), tr("Remove the selected rule"), this::deleteRule));
+        actions.add(button("↑", tr("Move up: rules run from top to bottom"), () -> move(-1)));
+        actions.add(button("↓", tr("Move down"), () -> move(1)));
 
-        JLabel hint = new JLabel("Rules run top to bottom; later rules never match text an earlier rule masked.");
+        JLabel hint = new JLabel(tr("Rules run top to bottom; later rules never match text an earlier rule masked."));
         hint.setFont(hint.getFont().deriveFont(Math.max(10f, hint.getFont().getSize2D() - 1f)));
         hint.setBorder(BorderFactory.createEmptyBorder(0, 4, 6, 4));
 
@@ -270,19 +272,19 @@ public final class RuleEditorDialog extends JDialog {
         replacementField.setFont(mono);
         idField.setFont(mono);
         int y = 0;
-        y = row(p, y, "Id", idField, "Unique identifier, used in profiles and on the command line");
-        y = row(p, y, "Name", nameField, null);
-        y = row(p, y, "Category", categoryBox, null);
-        y = row(p, y, "Pattern", patternField, "Java regular expression");
-        y = row(p, y, "Replace with", replacementField, "Use $1 or ${name} to keep captured text");
-        y = row(p, y, "Description", descriptionField, null);
+        y = row(p, y, tr("Id"), idField, tr("Unique identifier, used in profiles and on the command line"));
+        y = row(p, y, tr("Name"), nameField, null);
+        y = row(p, y, tr("Category"), categoryBox, null);
+        y = row(p, y, tr("Pattern"), patternField, tr("Java regular expression"));
+        y = row(p, y, tr("Replace with"), replacementField, tr("Use $1 or ${name} to keep captured text"));
+        y = row(p, y, tr("Description"), descriptionField, null);
         JPanel checks = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         checks.add(enabledBox);
         checks.add(javax.swing.Box.createHorizontalStrut(16));
         checks.add(caseBox);
         y = row(p, y, "", checks, null);
 
-        restore.setToolTipText("Reset this built-in rule to the shipped definition");
+        restore.setToolTipText(tr("Reset this built-in rule to the shipped definition"));
         restore.addActionListener(_ -> restoreDefault());
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(status, BorderLayout.CENTER);
@@ -353,7 +355,7 @@ public final class RuleEditorDialog extends JDialog {
             caseBox.setSelected(r.caseInsensitive());
             enabledBox.setSelected(r.enabled());
             updateRestore(r);
-            setStatus(r.builtin() ? "Built-in rule" : "Custom rule", false);
+            setStatus(r.builtin() ? tr("Built-in rule") : tr("Custom rule"), false);
         } finally {
             loading = false;
         }
@@ -368,7 +370,7 @@ public final class RuleEditorDialog extends JDialog {
         String id = idField.getText().strip();
         for (int k = 0; k < rules.size(); k++) {
             if (k != i && rules.get(k).id().equals(id)) {
-                setStatus("Another rule already uses the id '" + id + "'", true);
+                setStatus(tr("Another rule already uses the id '{0}'", id), true);
                 return;
             }
         }
@@ -380,7 +382,7 @@ public final class RuleEditorDialog extends JDialog {
             rules.set(i, r);
             tableModel.fireTableRowsUpdated(i, i);
             updateRestore(r);
-            setStatus(r.builtin() ? "Built-in rule" : "Custom rule", false);
+            setStatus(r.builtin() ? tr("Built-in rule") : tr("Custom rule"), false);
             updateTester();
         } catch (InvalidRuleException ex) {
             setStatus(ex.getMessage(), true);
@@ -421,8 +423,8 @@ public final class RuleEditorDialog extends JDialog {
         output.setEditable(false);
         JPanel p = new JPanel(new BorderLayout(0, 6));
         p.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        JLabel in = new JLabel("Test lines (paste lines from your logs)");
-        JLabel out = new JLabel("Normalized with the rules above — masked text is highlighted");
+        JLabel in = new JLabel(tr("Test lines (paste lines from your logs)"));
+        JLabel out = new JLabel(tr("Normalized with the rules above — masked text is highlighted"));
         JPanel inPanel = new JPanel(new BorderLayout(0, 4));
         inPanel.add(in, BorderLayout.NORTH);
         inPanel.add(new JScrollPane(sample), BorderLayout.CENTER);
@@ -515,9 +517,9 @@ public final class RuleEditorDialog extends JDialog {
         public String getColumnName(int c) {
             return switch (c) {
                 case 0 -> "";
-                case 1 -> "Name";
-                case 2 -> "Category";
-                default -> "Replaced by";
+                case 1 -> tr("Name");
+                case 2 -> tr("Category");
+                default -> tr("Replaced by");
             };
         }
 

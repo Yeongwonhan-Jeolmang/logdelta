@@ -1,0 +1,93 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please remove anything private from logs
+        before pasting them (LogDelta's reports already remove tokens, passwords and e-mail
+        addresses, but check anyway). **Security problems** go to private reporting instead:
+        see the link on the previous page.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the problem. Include any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The command line you ran, or the steps in the desktop app.
+      placeholder: |
+        logdelta -p team.ldprofile good.log bad.log
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample lines
+      description: >
+        A few anonymised lines from both logs. For rule problems, the output of
+        `logdelta explain "<line>"` is very helpful.
+      render: text
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Where does it happen?
+      options:
+        - Command line (diff)
+        - Command line (check)
+        - Desktop app
+        - GitHub Action
+        - Reports (HTML, Markdown, JSON, JUnit)
+        - Installer
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: LogDelta version
+      description: Output of `logdelta --version`, or Help › About in the app.
+      placeholder: LogDelta 2.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Linux (Debian/Ubuntu)
+        - Linux (Fedora/RHEL)
+        - Linux (other)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Installer from the releases page
+        - All-in-one jar
+        - Built from source
+        - GitHub Action
+    validations:
+      required: true
+  - type: input
+    id: java
+    attributes:
+      label: Java version
+      description: Only for the jar or a source build (`java -version`); installers bundle Java.

@@ -24,6 +24,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// Two source fields (baseline and candidate) with browse buttons, a swap button and a button
 /// for extra baseline runs. A path or an `http(s)` URL can be typed and confirmed with Enter,
 /// chosen with the button, or a file dropped onto a field.
@@ -31,7 +33,7 @@ public final class FileBar extends JPanel {
 
     private final JTextField leftField = new JTextField();
     private final JTextField rightField = new JTextField();
-    private final JButton baselines = new JButton("+ Baselines");
+    private final JButton baselines = new JButton(tr("+ Baselines"));
 
     /// @param onLeft      called with a source entered or dropped for the baseline
     /// @param onRight     called with a source entered or dropped for the candidate
@@ -49,38 +51,38 @@ public final class FileBar extends JPanel {
         c.fill = GridBagConstraints.HORIZONTAL;
 
         c.gridx = 0;
-        add(label("Baseline"), c);
+        add(label(tr("Baseline")), c);
         c.gridx = 1;
         c.weightx = 1;
-        add(field(leftField, onLeft, "The known-good log (left)"), c);
+        add(field(leftField, onLeft, tr("The known-good log (left)")), c);
         c.gridx = 2;
         c.weightx = 0;
-        add(button(Icons.open(), "Choose the baseline log", browseLeft), c);
+        add(button(Icons.open(), tr("Choose the baseline log"), browseLeft), c);
 
         c.gridx = 3;
-        JButton swap = button(Icons.swap(), "Swap baseline and candidate (Ctrl+Shift+S)", onSwap);
+        JButton swap = button(Icons.swap(), tr("Swap baseline and candidate (Ctrl+Shift+S)"), onSwap);
         add(swap, c);
 
         c.gridx = 4;
-        add(label("Candidate"), c);
+        add(label(tr("Candidate")), c);
         c.gridx = 5;
         c.weightx = 1;
-        add(field(rightField, onRight, "The log to check (right)"), c);
+        add(field(rightField, onRight, tr("The log to check (right)")), c);
         c.gridx = 6;
         c.weightx = 0;
-        add(button(Icons.open(), "Choose the candidate log", browseRight), c);
+        add(button(Icons.open(), tr("Choose the candidate log"), browseRight), c);
 
         c.gridx = 7;
         baselines.setFocusable(false);
-        baselines.setToolTipText("<html>Add more known-good runs. A difference that another good run shows<br>"
-                + "too is treated as normal variation instead of a change.</html>");
+        baselines.setToolTipText("<html>" + tr("Add more known-good runs. A difference that another good run "
+                + "shows too is treated as normal variation instead of a change.") + "</html>");
         baselines.addActionListener(_ -> onBaselines.accept(baselines));
         add(baselines, c);
     }
 
     /// Updates the label of the extra-baselines button.
     public void setBaselineCount(int n) {
-        baselines.setText(n == 0 ? "+ Baselines" : "+" + n + " baseline" + (n == 1 ? "" : "s"));
+        baselines.setText(n == 0 ? tr("+ Baselines") : tr("+{0} baseline(s)", n));
     }
 
     /// Shows the given sources without triggering callbacks.
@@ -109,7 +111,8 @@ public final class FileBar extends JPanel {
     }
 
     private JTextField field(JTextField f, Consumer<Source> target, String tip) {
-        f.setToolTipText(tip + " \u2014 type a path or URL and press Enter, or drop a file here");
+        f.setToolTipText(tip + " \u2014 " + tr("type a path or URL and press Enter, or drop a file here"));
+        f.getAccessibleContext().setAccessibleName(tip);
         f.putClientProperty("JTextField.placeholderText", "Drop a log file, or type a path or URL");
         f.addActionListener(_ -> {
             String text = f.getText().strip();
@@ -117,7 +120,7 @@ public final class FileBar extends JPanel {
                 try {
                     target.accept(Source.parse(text));
                 } catch (IllegalArgumentException e) { // includes InvalidPathException
-                    javax.swing.JOptionPane.showMessageDialog(f, e.getMessage(), "Cannot open",
+                    javax.swing.JOptionPane.showMessageDialog(f, e.getMessage(), tr("Cannot open"),
                             javax.swing.JOptionPane.ERROR_MESSAGE);
                 }
             }

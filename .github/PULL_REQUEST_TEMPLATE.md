@@ -4,7 +4,8 @@
 
 ## Checklist
 
-- [ ] `mvn verify` passes
+- [ ] `./mvnw verify` passes
 - [ ] Tests added or updated
 - [ ] Documentation updated (`README.md`, `docs/`, `CHANGELOG.md`)
 - [ ] Screenshots attached for UI changes
+- [ ] New user-visible text in the desktop app is wrapped in `tr(...)` and translated in `messages_ko.properties`

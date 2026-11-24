@@ -27,6 +27,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import static io.github.logdelta.gui.i18n.I18n.tr;
+
 /// A strip above the comparison that narrows what is shown: all lines, only changes, only new
 /// problems or only errors, optionally combined with a text filter.
 ///
@@ -48,7 +50,7 @@ public final class FilterBar extends JPanel {
         setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
         setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
 
-        JLabel show = new JLabel("Show");
+        JLabel show = new JLabel(tr("Show"));
         add(show);
         add(Box.createHorizontalStrut(6));
         ButtonGroup group = new ButtonGroup();
@@ -57,10 +59,10 @@ public final class FilterBar extends JPanel {
             b.setFocusable(false);
             b.putClientProperty("JComponent.sizeVariant", "small");
             b.setToolTipText(switch (m) {
-                case ALL -> "Every line; unchanged regions may be collapsed";
-                case CHANGES -> "Only lines that differ";
-                case PROBLEMS -> "Only new warnings and errors, with their stack traces";
-                case ERRORS -> "Only ERROR and FATAL lines, on either side";
+                case ALL -> tr("Every line; unchanged regions may be collapsed");
+                case CHANGES -> tr("Only lines that differ");
+                case PROBLEMS -> tr("Only new warnings and errors, with their stack traces");
+                case ERRORS -> tr("Only ERROR and FATAL lines, on either side");
             });
             b.addActionListener(_ -> fire());
             group.add(b);
@@ -89,7 +91,7 @@ public final class FilterBar extends JPanel {
             }
         });
         text.putClientProperty("JTextField.placeholderText", "Only lines containing…");
-        text.setToolTipText("Show only lines containing this text (either side, ignoring case). Esc clears it.");
+        text.setToolTipText(tr("Show only lines containing this text (either side, ignoring case). Esc clears it."));
         text.setMaximumSize(new Dimension(320, text.getPreferredSize().height + 4));
         text.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "clear");
         text.getActionMap().put("clear", new javax.swing.AbstractAction() {
@@ -102,7 +104,7 @@ public final class FilterBar extends JPanel {
         add(Box.createHorizontalStrut(4));
         add(text);
         JButton clear = new JButton("✕");
-        clear.setToolTipText("Clear the filter");
+        clear.setToolTipText(tr("Clear the filter"));
         clear.setFocusable(false);
         clear.addActionListener(_ -> setFilter(ViewFilter.NONE, true));
         add(Box.createHorizontalStrut(4));
@@ -142,7 +144,8 @@ public final class FilterBar extends JPanel {
 
     /// Updates the "showing N of M" label.
     public void setCounts(int shown, int total, boolean active) {
-        count.setText(active ? String.format(Locale.ROOT, "%,d of %,d lines", shown, total) : " ");
+        count.setText(active ? tr("{0} of {1} lines", String.format(Locale.ROOT, "%,d", shown),
+                String.format(Locale.ROOT, "%,d", total)) : " ");
     }
 
     /// Moves the keyboard focus to the text filter.

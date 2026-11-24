@@ -3,6 +3,11 @@
 
 package io.github.logdelta.core.util;
 
+import io.github.logdelta.core.structured.Field;
+import io.github.logdelta.core.structured.StructuredLines;
+import io.github.logdelta.core.structured.StructuredParser;
+
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +33,10 @@ public final class LogText {
     /// "java.net.SocketTimeoutException: Read timed out"                             ->  unchanged
     /// ```
     public static String message(String line) {
+        String structured = structuredMessage(line);
+        if (structured != null) {
+            return structured;
+        }
         String s = LEADING.matcher(line).replaceFirst("");
         Matcher level = LEVEL.matcher(s);
         if (level.find()) {
@@ -39,5 +48,34 @@ public final class LogText {
         }
         s = s.strip();
         return s.isEmpty() ? line.strip() : s;
+    }
+
+    /// For a JSON or logfmt line with a message field: the message, followed by the fields that
+    /// are neither time, level nor message (`order placed  status=502 order.id=ORD-1`).
+    static String structuredMessage(String line) {
+        String t = line.stripLeading();
+        List<Field> fields = null;
+        if (t.startsWith("{")) {
+            fields = StructuredParser.json(line);
+        } else if (t.indexOf('=') > 0 && t.indexOf('=') < 40) {
+            fields = StructuredParser.logfmt(line);
+        }
+        if (fields == null) {
+            return null;
+        }
+        String message = null;
+        StringBuilder rest = new StringBuilder();
+        for (Field f : fields) {
+            String name = f.name();
+            if (message == null && StructuredLines.MESSAGE_FIELDS.contains(name)) {
+                message = f.value();
+            } else if (!StructuredLines.TIME_FIELDS.contains(name) && !StructuredLines.LEVEL_FIELDS.contains(name)) {
+                rest.append(rest.isEmpty() ? "" : " ").append(name).append('=').append(f.value());
+            }
+        }
+        if (message == null) {
+            return null;
+        }
+        return rest.isEmpty() ? message.strip() : message.strip() + "  " + rest;
     }
 }

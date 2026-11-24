@@ -3,6 +3,7 @@
 
 package io.github.logdelta.core.io;
 
+import io.github.logdelta.core.timing.TimeWindow;
 import io.github.logdelta.core.util.CancellationToken;
 import io.github.logdelta.core.util.ProgressListener;
 
@@ -13,6 +14,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
@@ -20,6 +23,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
@@ -36,10 +40,24 @@ import java.util.zip.GZIPInputStream;
 ///
 /// Lines are split on `\n`, `\r\n` and `\r`. The reader streams the input,
 /// so memory use is proportional to the decoded text, not to the compressed size.
+///
+/// ## Large files
+///
+/// Uncompressed files of at least [#MMAP_THRESHOLD] bytes in UTF-8 or Latin-1 are read through
+/// memory-mapped buffers, which avoids copying the file through a stream decoder. With a
+/// [TimeWindow], lines before the window are skipped and reading stops as soon as the window has
+/// ended, so only the part of a multi-gigabyte log you care about is held in memory.
 public final class LogReader {
+
+    /// Files at least this large (and not compressed) are memory-mapped.
+    public static final long MMAP_THRESHOLD = 32L * 1024 * 1024;
 
     private static final int SNIFF_BYTES = 64 * 1024;
     private static final int PROGRESS_EVERY_LINES = 4096;
+    private static final long MAP_CHUNK = 256L * 1024 * 1024;
+    /// The thresholds in effect; tests lower them to exercise the memory-mapped path.
+    static long mmapThreshold = MMAP_THRESHOLD;
+    static long mapChunk = MAP_CHUNK;
 
     private LogReader() {
     }
@@ -57,14 +75,30 @@ public final class LogReader {
     /// @param token    allows the caller to abort the read
     public static LogFile read(Path path, Charset charset, ProgressListener progress,
                                CancellationToken token) throws IOException {
+        return read(path, charset, progress, token, null);
+    }
+
+    /// Reads the part of a file that falls inside a time window.
+    ///
+    /// @param window lines to keep, or `null` for all of them
+    public static LogFile read(Path path, Charset charset, ProgressListener progress,
+                               CancellationToken token, TimeWindow window) throws IOException {
         long size = Files.size(path);
+        String name = path.getFileName() == null ? path.toString() : path.getFileName().toString();
+        Sink sink = new Sink(window);
+        if (size >= mmapThreshold) {
+            Decoded mapped = readMapped(path, size, charset, sink, progress, token);
+            if (mapped != null) {
+                return new LogFile(name, path, sink.lines, mapped.charset, false, size, sink.firstLineNumber(), window);
+            }
+        }
         try (InputStream raw = Files.newInputStream(path)) {
             CountingInputStream counting = new CountingInputStream(raw);
-            String name = path.getFileName() == null ? path.toString() : path.getFileName().toString();
             ProgressListener scaled = size <= 0 ? ProgressListener.NONE
                     : (stage, _) -> progress.onProgress(stage, Math.min(1.0, counting.count / (double) size));
-            Decoded decoded = decode(counting, charset, scaled, token);
-            return new LogFile(name, path, decoded.lines, decoded.charset, decoded.compressed, size);
+            Decoded decoded = decode(counting, charset, scaled, token, sink);
+            return new LogFile(name, path, sink.lines, decoded.charset, decoded.compressed, size,
+                    sink.firstLineNumber(), window);
         }
     }
 
@@ -75,15 +109,51 @@ public final class LogReader {
     /// @param charset     charset to use, or `null` to detect it
     public static LogFile read(String displayName, InputStream in, Charset charset) throws IOException {
         CountingInputStream counting = new CountingInputStream(in);
-        Decoded decoded = decode(counting, charset, ProgressListener.NONE, CancellationToken.NEVER);
-        return new LogFile(displayName, null, decoded.lines, decoded.charset, decoded.compressed, counting.count);
+        Sink sink = new Sink(null);
+        Decoded decoded = decode(counting, charset, ProgressListener.NONE, CancellationToken.NEVER, sink);
+        return new LogFile(displayName, null, sink.lines, decoded.charset, decoded.compressed, counting.count);
     }
 
-    private record Decoded(List<String> lines, Charset charset, boolean compressed) {
+    private record Decoded(Charset charset, boolean compressed) {
+    }
+
+    /// Collects lines, applying the time window if there is one.
+    private static final class Sink {
+        final List<String> lines = new ArrayList<>();
+        private final TimeWindow.Slicer slicer;
+        private int seen;
+        private int first = -1;
+
+        Sink(TimeWindow window) {
+            this.slicer = window == null ? null : window.slicer();
+        }
+
+        /// Adds a line; returns `false` when reading can stop.
+        boolean add(String line) {
+            int index = seen++;
+            if (slicer != null) {
+                TimeWindow.Slicer.Decision d = slicer.accept(line);
+                if (d == TimeWindow.Slicer.Decision.STOP) {
+                    return false;
+                }
+                if (d == TimeWindow.Slicer.Decision.SKIP) {
+                    return true;
+                }
+            }
+            if (first < 0) {
+                first = index;
+            }
+            lines.add(line);
+            return true;
+        }
+
+        int firstLineNumber() {
+            return first < 0 ? seen + 1 : first + 1;
+        }
     }
 
     private static Decoded decode(InputStream source, Charset forced, ProgressListener progress,
-                                  CancellationToken token) throws IOException {
+                                  CancellationToken token, Sink sink) throws IOException {
         BufferedInputStream in = new BufferedInputStream(source, SNIFF_BYTES);
         boolean gzip = startsWith(in, new byte[] {(byte) 0x1f, (byte) 0x8b});
         if (gzip) {
@@ -117,19 +187,120 @@ public final class LogReader {
         CharsetDecoder decoder = charset.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE);
-        List<String> lines = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, decoder), 64 * 1024)) {
             String line;
+            int count = 0;
             while ((line = reader.readLine()) != null) {
-                lines.add(line);
-                if (lines.size() % PROGRESS_EVERY_LINES == 0) {
+                if (!sink.add(line)) {
+                    break;
+                }
+                if (++count % PROGRESS_EVERY_LINES == 0) {
                     token.throwIfCancelled();
                     progress.onProgress("Reading", 0);
                 }
             }
         }
         progress.onProgress("Reading", 1);
-        return new Decoded(lines, charset, gzip);
+        return new Decoded(charset, gzip);
+    }
+
+    /// Reads a large uncompressed file through memory-mapped chunks.
+    ///
+    /// @return `null` if the file is compressed or its charset is not byte-oriented (UTF-8,
+    ///         Latin-1, ASCII); the caller then falls back to the streaming reader
+    private static Decoded readMapped(Path path, long size, Charset forced, Sink sink, ProgressListener progress,
+                                      CancellationToken token) throws IOException {
+        try (FileChannel ch = FileChannel.open(path, StandardOpenOption.READ)) {
+            ByteBuffer headBuf = ByteBuffer.allocate((int) Math.min(SNIFF_BYTES, size));
+            while (headBuf.hasRemaining() && ch.read(headBuf, headBuf.position()) > 0) {
+                // fill the sample
+            }
+            byte[] head = java.util.Arrays.copyOf(headBuf.array(), headBuf.position());
+            if (head.length >= 2 && (head[0] & 0xFF) == 0x1f && (head[1] & 0xFF) == 0x8b) {
+                return null;
+            }
+            Bom bom = Bom.detect(head);
+            Charset charset = forced;
+            if (charset == null) {
+                charset = bom != null ? bom.charset
+                        : looksLikeUtf8(head, head.length == SNIFF_BYTES) ? StandardCharsets.UTF_8
+                        : StandardCharsets.ISO_8859_1;
+            }
+            if (!isByteOriented(charset)) {
+                return null;
+            }
+            long pos = bom != null && bom.charset.equals(charset) ? bom.length : 0;
+            byte[] carry = new byte[0];
+            int carryLen = 0;
+            byte[] lineBuf = new byte[8192];
+            boolean pendingCr = false;
+            int count = 0;
+            outer:
+            while (pos < size) {
+                long len = Math.min(mapChunk, size - pos);
+                MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, pos, len);
+                int limit = (int) len;
+                int start = 0;
+                for (int i = 0; i < limit; i++) {
+                    byte b = buf.get(i);
+                    if (b != '\n' && b != '\r') {
+                        continue;
+                    }
+                    if (b == '\n' && pendingCr && i == start && carryLen == 0) {
+                        // second half of a \r\n that straddled the previous terminator
+                        pendingCr = false;
+                        start = i + 1;
+                        continue;
+                    }
+                    pendingCr = false;
+                    int partLen = i - start;
+                    int total = carryLen + partLen;
+                    if (lineBuf.length < total) {
+                        lineBuf = new byte[Math.max(total, lineBuf.length * 2)];
+                    }
+                    System.arraycopy(carry, 0, lineBuf, 0, carryLen);
+                    buf.get(start, lineBuf, carryLen, partLen);
+                    carryLen = 0;
+                    if (!sink.add(new String(lineBuf, 0, total, charset))) {
+                        break outer;
+                    }
+                    if (b == '\r') {
+                        if (i + 1 < limit) {
+                            if (buf.get(i + 1) == '\n') {
+                                i++;
+                            }
+                        } else {
+                            pendingCr = true;
+                        }
+                    }
+                    start = i + 1;
+                    if (++count % PROGRESS_EVERY_LINES == 0) {
+                        token.throwIfCancelled();
+                        progress.onProgress("Reading", Math.min(1.0, (pos + i) / (double) size));
+                    }
+                }
+                int rest = limit - start;
+                if (rest > 0) {
+                    if (carry.length < carryLen + rest) {
+                        carry = java.util.Arrays.copyOf(carry, Math.max(carryLen + rest, carry.length * 2));
+                    }
+                    buf.get(start, carry, carryLen, rest);
+                    carryLen += rest;
+                    pendingCr = false;
+                }
+                pos += len;
+            }
+            if (carryLen > 0) {
+                sink.add(new String(carry, 0, carryLen, charset));
+            }
+            progress.onProgress("Reading", 1);
+            return new Decoded(charset, false);
+        }
+    }
+
+    private static boolean isByteOriented(Charset c) {
+        return c.equals(StandardCharsets.UTF_8) || c.equals(StandardCharsets.ISO_8859_1)
+                || c.equals(StandardCharsets.US_ASCII);
     }
 
     private static boolean startsWith(BufferedInputStream in, byte[] magic) throws IOException {
